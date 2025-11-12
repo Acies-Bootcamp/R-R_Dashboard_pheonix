@@ -2,7 +2,7 @@ import streamlit as st
 # from summary import show_summary
 from reco_team import show_recognition_team_tab
 from reco_individual import show_recognition_individual_tab
-# from award_analysis import show_award_analysis
+from award_analysis import show_award_analysis
 # from coupon_estimation import show_coupon_estimation
 
 st.set_page_config(page_title="R&R Dashboard", layout="wide")
@@ -23,7 +23,7 @@ elif section == "Recognition":
     recognition_main()
 
 elif section == "Award Analysis":
-    # show_award_analysis()
+    show_award_analysis()
     print()
 
 elif section == "Coupon Estimation":
