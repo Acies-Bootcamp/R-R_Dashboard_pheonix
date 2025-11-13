@@ -7,25 +7,43 @@ from award_analysis import show_award_analysis
 
 st.set_page_config(page_title="R&R Dashboard", layout="wide")
 
-section = st.sidebar.radio("Go to Section", ["Summary Overview", "Recognition", "Award Analysis", "Coupon Estimation"])
+# Sidebar navigation
+section = st.sidebar.radio(
+    "Go to Section",
+    ["Home","Overview", "Recognition", "Award Analysis", "Coupon Estimation","Findings/Insights"]
+)
 
 def recognition_main():
     tab1, tab2 = st.tabs(["Team", "Individual"])
     with tab1:
-        show_recognition_team_tab()  # The full team code provided
+        show_recognition_team_tab()   # full team module
     with tab2:
-        show_recognition_individual_tab()  # Separate function for individual analytics
+        show_recognition_individual_tab()  # individual module
 
-if section == "Summary Overview":
-    # show_summary()
+# Router
+if section == "Home":
     print()
+elif section == "Overview":
+    st.title("Summary Overview")
+    st.info("Summary page under development.")
+    # show_summary()
+
 elif section == "Recognition":
     recognition_main()
 
 elif section == "Award Analysis":
+<<<<<<< HEAD
     show_award_analysis()
     print()
+=======
+    st.title("Award Analysis")
+    st.info("Award Analysis module under development.")
+    # show_award_analysis()
+>>>>>>> origin/Karthik
 
 elif section == "Coupon Estimation":
+    st.title("Coupon Estimation")
+    st.info("Coupon Estimation module under development.")
     # show_coupon_estimation()
+elif section =="Hypothesis/Insights":
     print()
