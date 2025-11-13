@@ -1,10 +1,11 @@
 import streamlit as st
+from summary_overview import show_summary_overview
 from home import show_home_page       # ✅ import home page function
 from reco_team import show_recognition_team_tab
 from reco_individual import show_recognition_individual_tab
 from award_analysis import show_award_analysis
 # from summary import show_summary
-# from coupon_estimation import show_coupon_estimation
+from coupoun_estimation import show_coupon_estimation
 
 st.set_page_config(page_title="R&R Dashboard", layout="wide")
 
@@ -27,8 +28,7 @@ if section == "Home":
 
 elif section == "Overview":
     st.title("Summary Overview")
-    st.info("Summary page under development.")
-    # show_summary()
+    show_summary_overview()
 
 elif section == "Recognition":
     recognition_main()
@@ -40,7 +40,7 @@ elif section == "Award Analysis":
 elif section == "Coupon Estimation":
     st.title("Coupon Estimation")
     st.info("Coupon Estimation module under development.")
-    # show_coupon_estimation()
+    show_coupon_estimation()
 
 elif section == "Findings/Insights":
     st.title("Findings / Insights")
