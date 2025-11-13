@@ -3,7 +3,7 @@ import streamlit as st
 from reco_team import show_recognition_team_tab
 from reco_individual import show_recognition_individual_tab
 from award_analysis import show_award_analysis
-# from coupon_estimation import show_coupon_estimation
+from coupoun_estimation import show_coupon_estimation
 
 st.set_page_config(page_title="R&R Dashboard", layout="wide")
 
@@ -34,11 +34,11 @@ elif section == "Recognition":
 elif section == "Award Analysis":
     st.title("Award Analysis")
     st.info("Award Analysis module under development.")
-    # show_award_analysis()
+    show_award_analysis()
 
 elif section == "Coupon Estimation":
     st.title("Coupon Estimation")
     st.info("Coupon Estimation module under development.")
-    # show_coupon_estimation()
+    show_coupon_estimation()
 elif section =="Hypothesis/Insights":
     print()
