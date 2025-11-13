@@ -32,14 +32,9 @@ elif section == "Recognition":
     recognition_main()
 
 elif section == "Award Analysis":
-<<<<<<< HEAD
-    show_award_analysis()
-    print()
-=======
     st.title("Award Analysis")
     st.info("Award Analysis module under development.")
     # show_award_analysis()
->>>>>>> origin/Karthik
 
 elif section == "Coupon Estimation":
     st.title("Coupon Estimation")
