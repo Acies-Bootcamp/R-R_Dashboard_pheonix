@@ -38,6 +38,6 @@ elif section == "Award Analysis":
 
 elif section == "Coupon Estimation":
     st.title("Coupon Estimation")
-    # show_coupon_estimation()
+    show_coupon_estimation()
 elif section =="Hypothesis/Insights":
     print()
