@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from utils import load_css   # ⭐ LOAD GLOBAL CSS
 
 
 # ============================================================
@@ -88,12 +89,30 @@ def moving_average_quarterly(series, periods=4):
 
 
 # ============================================================
+# CHART CARD WRAPPERS (Glass UI)
+# ============================================================
+
+def chart_card_start(title):
+    st.markdown(f"""
+        <div class='glass-card' style='padding:20px; margin-top:15px;'>
+            <h3 style="margin-bottom:10px;">{title}</h3>
+    """, unsafe_allow_html=True)
+
+def chart_card_end():
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ============================================================
 # MAIN STREAMLIT FUNCTION
 # ============================================================
 
 def show_coupon_estimation():
 
-    st.title("📦 Coupon Estimation – Holt-Winters (Monthly) + Moving Average (Quarterly)")
+    # ⭐ Load CSS first
+    load_css()
+
+    st.markdown("<h1 style='text-align:center;'>📦 Coupon Estimation Dashboard</h1>",
+                unsafe_allow_html=True)
 
     # Load sheet
     sheet_key = "1xVpXomZBOyIeyvpyDjXQlSEIfU35v6j0jkhdaETm4-Q"
@@ -140,13 +159,29 @@ def show_coupon_estimation():
     quarterly = df_filtered.groupby(pd.Grouper(key="Date", freq="Q"))["Coupon Amount"].count().asfreq("Q").fillna(0)
 
     # ============================================================
-    # BASIC KPIs
+    # BASIC KPIs — inside glass cards
     # ============================================================
 
     st.subheader("📌 KPIs — Count Based")
-    k1, k2 = st.columns(2)
-    k1.metric("Total Coupons (Last 12M)", f"{monthly.tail(12).sum():.0f}")
-    k2.metric("Avg Monthly Coupons", f"{monthly.tail(12).mean():.0f}")
+
+    kpi1, kpi2 = st.columns(2)
+
+    with kpi1:
+        st.markdown("""
+            <div class='glass-card' style='padding:20px; text-align:center;'>
+                <h4>Total Coupons (Last 12 Months)</h4>
+        """, unsafe_allow_html=True)
+        st.metric("", f"{monthly.tail(12).sum():.0f}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with kpi2:
+        st.markdown("""
+            <div class='glass-card' style='padding:20px; text-align:center;'>
+                <h4>Average Monthly Coupons</h4>
+        """, unsafe_allow_html=True)
+        st.metric("", f"{monthly.tail(12).mean():.0f}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
     # ============================================================
     # FORECAST MODELS
@@ -155,38 +190,64 @@ def show_coupon_estimation():
     monthly_fc, m_train, m_test, m_test_pred = holt_winters_monthly(monthly, 6)
     quarterly_fc, q_train, q_test, q_test_pred = moving_average_quarterly(quarterly, 4)
 
+
     # ============================================================
-    # MONTHLY GRAPH
+    # 📈 MONTHLY FORECAST (Glass Card Chart)
     # ============================================================
 
-    st.subheader("📈 Monthly Forecast – Holt-Winters")
+    chart_card_start("📈 Monthly Forecast – Holt-Winters")
 
     fig1 = go.Figure()
     fig1.add_trace(go.Scatter(x=m_train.index, y=m_train, name="Train"))
     fig1.add_trace(go.Scatter(x=m_test.index, y=m_test, name="Test"))
-    fig1.add_trace(go.Scatter(x=m_test_pred.index, y=m_test_pred, name="Prediction", line=dict(dash="dot"), marker=dict(color="orange")))
-    fig1.add_trace(go.Scatter(x=monthly_fc.index, y=monthly_fc, name="Forecast", line=dict(dash="dash"), marker=dict(color="green")))
+    fig1.add_trace(go.Scatter(
+        x=m_test_pred.index, y=m_test_pred, name="Prediction",
+        line=dict(dash="dot"), marker=dict(color="orange")
+    ))
+    fig1.add_trace(go.Scatter(
+        x=monthly_fc.index, y=monthly_fc, name="Forecast",
+        line=dict(dash="dash"), marker=dict(color="green")
+    ))
+
     st.plotly_chart(fig1, use_container_width=True)
+    chart_card_end()
+
 
     # ============================================================
-    # QUARTERLY GRAPH
+    # 📈 QUARTERLY FORECAST (Glass Card Chart)
     # ============================================================
 
-    st.subheader("📈 Quarterly Forecast – Moving Average")
+    chart_card_start("📈 Quarterly Forecast – Moving Average")
 
     fig2 = go.Figure()
     fig2.add_trace(go.Scatter(x=q_train.index, y=q_train, name="Train"))
     fig2.add_trace(go.Scatter(x=q_test.index, y=q_test, name="Test"))
-    fig2.add_trace(go.Scatter(x=q_test_pred.index, y=q_test_pred, name="Prediction", line=dict(dash="dot"), marker=dict(color="orange")))
-    fig2.add_trace(go.Scatter(x=quarterly_fc.index, y=quarterly_fc, name="Forecast", line=dict(dash="dash"), marker=dict(color="green")))
+    fig2.add_trace(go.Scatter(
+        x=q_test_pred.index, y=q_test_pred, name="Prediction",
+        line=dict(dash="dot"), marker=dict(color="orange")
+    ))
+    fig2.add_trace(go.Scatter(
+        x=quarterly_fc.index, y=quarterly_fc, name="Forecast",
+        line=dict(dash="dash"), marker=dict(color="green")
+    ))
+
     st.plotly_chart(fig2, use_container_width=True)
+    chart_card_end()
+
 
     # ============================================================
-    # FORECAST TABLES
+    # 📄 FORECAST TABLES (Glass Style)
     # ============================================================
 
-    st.subheader("📄 Monthly Forecast Table")
+    chart_card_start("📄 Monthly Forecast Table")
     st.dataframe(monthly_fc.to_frame("Predicted Count"))
+    chart_card_end()
 
-    st.subheader("📄 Quarterly Forecast Table")
+    chart_card_start("📄 Quarterly Forecast Table")
     st.dataframe(quarterly_fc.to_frame("Predicted Count"))
+    chart_card_end()
+
+
+# Run standalone
+if __name__ == "__main__":
+    show_coupon_estimation()

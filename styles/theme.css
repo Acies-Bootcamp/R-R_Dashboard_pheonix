@@ -1,0 +1,144 @@
+/* ===========================================
+   FIX TOP GAP / REMOVE HEADER WHITESPACE
+   =========================================== */
+header, [data-testid="stHeader"] {
+    height: 0 !important;
+    padding: 0 !important;
+}
+
+[data-testid="stAppViewContainer"] > .main {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* ===========================================
+   GLOBAL BACKGROUND (Slightly Darker Blue Gradient)
+   =========================================== */
+html, body, [data-testid="stAppViewContainer"] {
+    background: linear-gradient(135deg, #d7e2ff 0%, #e8eeff 40%, #d7e2ff 100%) !important;
+}
+
+/* ===========================================
+   SIDEBAR — Light Royal Blue (NOT too dark)
+   =========================================== */
+section[data-testid="stSidebar"] {
+    background: #2E4AA8 !important;          /* Royal Blue */
+    border-right: 1px solid rgba(255,255,255,0.15);
+    width: 260px !important;
+    padding-top: 20px !important;
+}
+
+/* Keep sidebar always visible */
+section[data-testid="stSidebar"] > div {
+    transform: none !important;
+    visibility: visible !important;
+}
+
+/* Hide collapse button */
+button[title="Close sidebar"], button[title="Open sidebar"] {
+    display: none !important;
+}
+
+/* ===========================================
+   SIDEBAR TEXT STYLE
+   =========================================== */
+[data-testid="stSidebar"] * {
+    color: #f5f7ff !important;
+    font-size: 1.05rem !important;
+    font-weight: 500 !important;
+}
+
+/* Radio labels */
+.stRadio label {
+    font-size: 1.15rem !important;
+    font-weight: 600 !important;
+    color: #f0f3ff !important;
+}
+
+/* Hover effect */
+.stRadio div:hover label {
+    color: #ffffff !important;
+    transform: translateX(4px);
+    transition: 0.2s ease-in-out;
+}
+
+/* Active item highlight */
+.stRadio label[data-testid="stMarkdownContainer"] p {
+    color: #ffffff !important;
+}
+
+/* ===========================================
+   KPI CARDS — Glass Effect + Hover Color Change
+   =========================================== */
+.kpi-card {
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(14px);
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.4);
+    transition: 0.25s ease;
+    text-align: center;
+}
+
+.kpi-card:hover {
+    background: rgba(210,225,255,0.55);
+    transform: translateY(-4px);
+}
+
+.kpi-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #243B82 !important;
+}
+
+.kpi-value {
+    font-size: 2.1rem;
+    font-weight: 800;
+    color: #0c1f55 !important;
+}
+
+/* ===========================================
+   CHART CARDS — Glass effect
+   =========================================== */
+.chart-card {
+    background: rgba(255,255,255,0.35);
+    border-radius: 18px;
+    padding: 18px;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.3);
+    transition: 0.3s ease;
+}
+
+.chart-card:hover {
+    background: rgba(225,235,255,0.55);
+}
+
+/* ===========================================
+   HEADINGS
+   =========================================== */
+h1, h2, h3 {
+    color: #132b63 !important;
+    font-weight: 800 !important;
+}
+
+
+/* ===========================================
+   REMOVE TOP GAP / WHITE SPACE  (ADD THIS AT END)
+============================================== */
+
+/* Remove Streamlit header completely */
+header, [data-testid="stHeader"] {
+    display: none !important;
+}
+
+/* Remove extra padding from the main app container */
+[data-testid="stAppViewContainer"] {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Remove the padding inside the main block container */
+[data-testid="block-container"] {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}

@@ -2,10 +2,35 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from utils import load_css   # ⭐ Global CSS loader
 
+
+# ============================================================
+# GLASS CARD HELPERS
+# ============================================================
+
+def chart_card_start(title):
+    st.markdown(
+        f"""
+        <div class='glass-card' style='padding:20px; margin-top:15px;'>
+            <h3 style="margin-bottom:10px;">{title}</h3>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def chart_card_end():
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ============================================================
+# MAIN FUNCTION
+# ============================================================
 
 def show_recognition_individual_tab():
-    """Display individual recognition analysis with filters, KPIs, and insights"""
+
+    # ⭐ Load theme.css first
+    load_css()
 
     # ---------------- LOAD DATA ----------------
     sheet_key = "1xVpXomZBOyIeyvpyDjXQlSEIfU35v6j0jkhdaETm4-Q"
@@ -17,7 +42,6 @@ def show_recognition_individual_tab():
     df["Employee Name"] = df["Employee Name"].astype(str)
     df["year"] = pd.to_numeric(df["year"], errors="coerce")
 
-    # Add month if available
     if "month" not in df.columns and "Award Date" in df.columns:
         df["Award Date"] = pd.to_datetime(df["Award Date"], errors="coerce")
         df["month"] = df["Award Date"].dt.month
@@ -27,7 +51,8 @@ def show_recognition_individual_tab():
     # ============================================================
     # FILTERS SECTION
     # ============================================================
-    st.markdown("### 🎯 Filters")
+
+    chart_card_start("🎯 Filters")
 
     years = sorted(df["year"].dropna().unique())
     year_options = ["All"] + [str(int(y)) for y in years]
@@ -66,7 +91,7 @@ def show_recognition_individual_tab():
 
     with col3:
         selected_team = st.selectbox(
-            "👥 Select Team (optional)",
+            "👥 Select Team",
             ["All"] + teams,
             index=(["All"] + teams).index(default_team)
             if default_team in ["All"] + teams else 0,
@@ -75,7 +100,7 @@ def show_recognition_individual_tab():
 
     with col4:
         selected_employee = st.selectbox(
-            "🧑‍💼 Select Employee (optional)",
+            "🧑‍💼 Select Employee",
             ["All"] + employees,
             index=(["All"] + employees).index(default_employee)
             if default_employee in ["All"] + employees else 0,
@@ -88,11 +113,13 @@ def show_recognition_individual_tab():
             for key in ["year_filter", "award_filter", "team_filter", "emp_filter"]:
                 if key in st.session_state:
                     del st.session_state[key]
-            st.success("✅ All filters cleared! Showing complete data.")
+            st.success("✅ All filters cleared!")
             st.rerun()
 
     if st.session_state.reset_filters:
         st.session_state.reset_filters = False
+
+    chart_card_end()
 
     # ---------------- APPLY FILTERS ----------------
     filtered_df = df.copy()
@@ -109,12 +136,11 @@ def show_recognition_individual_tab():
     if selected_employee != "All":
         filtered_df = filtered_df[filtered_df["Employee Name"] == selected_employee]
 
-    st.markdown("---")
-
     # ============================================================
     # KPI METRICS SECTION
     # ============================================================
-    st.markdown("### 📊 Key Performance Indicators")
+
+    chart_card_start("📊 Key Performance Indicators")
 
     total_employees = filtered_df["Employee Name"].nunique()
     total_awards = len(filtered_df)
@@ -133,12 +159,13 @@ def show_recognition_individual_tab():
     k4.metric("⭐ Top Performer Awards", f"{top_performer_awards}")
     k5.metric("🎯 Multi-Award Rate", f"{recognition_rate:.1f}%")
 
-    st.markdown("---")
+    chart_card_end()
 
     # ============================================================
     # CHART 1: Top Performers (SUNBURST)
     # ============================================================
-    st.subheader("🌟 Top Performers (Sunburst)")
+
+    chart_card_start("🌟 Top Performers (Sunburst)")
 
     top_ind = (
         filtered_df.groupby(["Employee Name", "Team name"])["New_Award_title"]
@@ -155,19 +182,20 @@ def show_recognition_individual_tab():
             values="Total Awards",
             color="Total Awards",
             color_continuous_scale="Viridis",
-            title="Sunburst View - Top 15 Award Recipients"
+            title="Top 15 Award Recipients"
         )
         fig1.update_layout(height=600)
         st.plotly_chart(fig1, use_container_width=True)
     else:
-        st.info("No data available for selected filters.")
+        st.info("No data available.")
 
-    st.markdown("---")
+    chart_card_end()
 
     # ============================================================
-    # CHART 2: LOW RECOGNITION (VERTICAL BAR WITH UNIQUE COLORS)
+    # CHART 2: Low Recognition Employees
     # ============================================================
-    st.subheader("⚠️ Low Recognition Employees (Vertical Bar Chart)")
+
+    chart_card_start("⚠️ Low Recognition Employees")
 
     low_ind = (
         filtered_df.groupby("Employee Name")["New_Award_title"]
@@ -183,23 +211,23 @@ def show_recognition_individual_tab():
             low_sorted,
             x="Employee Name",
             y="Total Awards",
-            color="Employee Name",          # 🎨 Different color per employee
+            color="Employee Name",
             title="Employees With 1 or Fewer Awards",
             text="Total Awards"
         )
-        fig2.update_layout(height=500, showlegend=False)
         fig2.update_traces(textposition="outside")
-
+        fig2.update_layout(height=500, showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
     else:
-        st.info("No employees with 1 or fewer awards.")
+        st.success("🎉 All employees have 2+ awards!")
 
-    st.markdown("---")
+    chart_card_end()
 
     # ============================================================
     # CHART 3: Histogram
     # ============================================================
-    st.subheader("📈 Recognition Distribution Histogram")
+
+    chart_card_start("📈 Recognition Distribution Histogram")
 
     award_counts_df = employee_awards.reset_index(name="Awards Count")
 
@@ -213,12 +241,13 @@ def show_recognition_individual_tab():
 
     st.plotly_chart(fig3, use_container_width=True)
 
-    st.markdown("---")
+    chart_card_end()
 
     # ============================================================
     # CHART 4: Treemap
     # ============================================================
-    st.subheader("🏅 Award Types by Top Performers (Treemap)")
+
+    chart_card_start("🏅 Award Types by Top Performers (Treemap)")
 
     top_10 = employee_awards.nlargest(10).index
     top_df = filtered_df[filtered_df["Employee Name"].isin(top_10)]
@@ -236,19 +265,20 @@ def show_recognition_individual_tab():
             values="Count",
             color="Count",
             color_continuous_scale="Blues",
-            title="Treemap - Award Type Breakdown (Top 10 Performers)"
+            title="Award Type Breakdown (Top 10 Performers)"
         )
         fig4.update_layout(height=600)
         st.plotly_chart(fig4, use_container_width=True)
     else:
         st.info("No award data available.")
 
-    st.markdown("---")
+    chart_card_end()
 
     # ============================================================
     # TABLE 1: Top 20 Recipients
     # ============================================================
-    st.subheader("📋 Top 20 Recipients - Detailed View")
+
+    chart_card_start("📋 Top 20 Recipients")
 
     top20 = (
         filtered_df.groupby(["Employee Name", "Team name"])
@@ -264,12 +294,13 @@ def show_recognition_individual_tab():
         height=400
     )
 
-    st.markdown("---")
+    chart_card_end()
 
     # ============================================================
     # TABLE 2: Gap Analysis
     # ============================================================
-    st.subheader("🔍 Recognition Gap Analysis")
+
+    chart_card_start("🔍 Recognition Gap Analysis")
 
     summary = (
         filtered_df.groupby("Employee Name")
@@ -288,4 +319,6 @@ def show_recognition_individual_tab():
         )
         st.info(f"💡 {len(low_rec)} employees have minimal recognition.")
     else:
-        st.success("✅ All employees received 3+ awards!")
+        st.success("🎉 All employees received 3+ awards!")
+
+    chart_card_end()

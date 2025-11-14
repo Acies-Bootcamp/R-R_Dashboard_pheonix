@@ -1,6 +1,12 @@
 import streamlit as st
+from utils import load_css   # ⭐ Import CSS loader
+
 
 def show_home_page():
+
+    # ⭐ Load global CSS theme first
+    load_css()
+
     st.title("🏆 Rewards & Recognition Dashboard")
     st.caption("Developed as part of the Capstone Project • November 2025")
 
@@ -22,6 +28,7 @@ def show_home_page():
 
     st.markdown("---")
     st.markdown("### ⚙️ Key Modules in This Dashboard")
+    
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("""
