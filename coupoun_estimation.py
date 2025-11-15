@@ -135,7 +135,6 @@ def holtwinters_auto_forecast(series, periods, seasonal_period):
 
 def show_coupon_estimation():
 
-    st.title("Coupon Estimation App")
 
     tab1, tab2 = st.tabs(["Forecasting Dashboard", "Methodology"])
 

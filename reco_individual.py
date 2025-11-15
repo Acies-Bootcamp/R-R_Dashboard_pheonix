@@ -3,9 +3,72 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+# -------------------------------------------------
+# Global Glass / KPI CSS
+# -------------------------------------------------
+GLASS_KPI_CSS = """
+<style>
+.metric-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(180, 180, 180, 0.7);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.10);
+  text-align: center;
+}
+.metric-card h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 0.25rem;
+}
+.metric-card h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+/* KPI label + ? helper */
+.kpi-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.kpi-help {
+  font-size: 0.75rem;
+  color: #6b7280;
+  border-radius: 999px;
+  border: 1px solid #d4d4d8;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  background-color: #f9fafb;
+}
+
+/* Optional: light glass for all charts */
+.stPlotlyChart {
+  background: radial-gradient(circle at top left,
+                              rgba(255,255,255,0.85),
+                              rgba(243,244,246,0.98));
+  border-radius: 16px;
+  padding: 12px;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+</style>
+"""
+
 
 def show_recognition_individual_tab():
     """Display individual recognition analysis with filters, KPIs, and insights"""
+
+    # Inject CSS
+    st.markdown(GLASS_KPI_CSS, unsafe_allow_html=True)
 
     # ---------------- LOAD DATA ----------------
     sheet_key = "1xVpXomZBOyIeyvpyDjXQlSEIfU35v6j0jkhdaETm4-Q"
@@ -25,7 +88,7 @@ def show_recognition_individual_tab():
     st.header("Individual Recognition Analysis")
 
     # ============================================================
-    # FILTER SECTION — HORIZONTAL LIKE YOUR SCREENSHOT
+    # FILTER SECTION — HORIZONTAL
     # ============================================================
 
     st.markdown("### 🔎 Filters")
@@ -42,7 +105,8 @@ def show_recognition_individual_tab():
         selected_years = st.multiselect(
             "Select Year(s)",
             year_options,
-            default=["All"]
+            default=["All"],
+            key="ind_years_multiselect",   # unique key
         )
 
     # Create temporary DF based on earlier filters
@@ -56,7 +120,8 @@ def show_recognition_individual_tab():
         selected_awards = st.multiselect(
             "Select Award Title",
             award_options,
-            default=["All"]
+            default=["All"],
+            key="ind_awards_multiselect",  # unique key
         )
 
     if "All" not in selected_awards:
@@ -67,7 +132,8 @@ def show_recognition_individual_tab():
         team_options = ["All"] + sorted(temp_df["Team name"].dropna().unique())
         selected_team = st.selectbox(
             "Select Team",
-            team_options
+            team_options,
+            key="ind_team_selectbox",       # unique key
         )
 
     if selected_team != "All":
@@ -78,7 +144,8 @@ def show_recognition_individual_tab():
         employee_options = ["All"] + sorted(temp_df["Employee Name"].dropna().unique())
         selected_employee = st.selectbox(
             "Select Employee",
-            employee_options
+            employee_options,
+            key="ind_employee_selectbox",   # unique key
         )
 
     if selected_employee != "All":
@@ -88,7 +155,7 @@ def show_recognition_individual_tab():
     with f5:
         st.write("")
         st.write("")
-        if st.button("Clear Filters"):
+        if st.button("Clear Filters", key="ind_clear_filters_btn"):
             st.rerun()
 
     # Final filtered data
@@ -97,7 +164,7 @@ def show_recognition_individual_tab():
     st.markdown("---")
 
     # ============================================================
-    # KPI SECTION
+    # KPI SECTION  (GLASS + ? HOVER)
     # ============================================================
 
     st.markdown("### 📊 Key Performance Indicators Based Upon Filters")
@@ -112,10 +179,70 @@ def show_recognition_individual_tab():
     recognition_rate = (employees_with_multiple / total_employees * 100) if total_employees else 0
 
     k1, k2, k4, k5 = st.columns(4)
-    k1.metric("Total Employees", f"{total_employees:,}")
-    k2.metric("Total Awards", f"{total_awards:,}")
-    k4.metric("Most Awards Received For Individuals", f"{top_performer_awards}")
-    k5.metric("Multi-Award Rate", f"{recognition_rate:.1f}%")
+
+    with k1:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+              <h4>
+                <span class="kpi-label">
+                  Total Employees
+                  <span class="kpi-help" title="Number of unique individuals who appear in the filtered dataset.">?</span>
+                </span>
+              </h4>
+              <h2>{total_employees:,}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with k2:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+              <h4>
+                <span class="kpi-label">
+                  Total Awards
+                  <span class="kpi-help" title="Total count of recognition instances in the filtered data (all award titles combined).">?</span>
+                </span>
+              </h4>
+              <h2>{total_awards:,}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with k4:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+              <h4>
+                <span class="kpi-label">
+                  Most Awards (Single Individual)
+                  <span class="kpi-help" title="Highest number of awards received by any one individual within the current filters.">?</span>
+                </span>
+              </h4>
+              <h2>{top_performer_awards}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with k5:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+              <h4>
+                <span class="kpi-label">
+                  Multi-Award Rate
+                  <span class="kpi-help" title="Percentage of employees who have received more than one award (repeat recognition).">?</span>
+                </span>
+              </h4>
+              <h2>{recognition_rate:.1f}%</h2>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
 
@@ -263,7 +390,7 @@ def show_recognition_individual_tab():
     overall_avg = team_gap["Awards per Employee"].mean()
 
     team_gap["Gap Flag"] = team_gap["Awards per Employee"].apply(
-        lambda x: "Low" if x < overall_avg * 0.5 
+        lambda x: "Low" if x < overall_avg * 0.5
         else ("Moderate" if x < overall_avg else "Good")
     )
 
@@ -279,7 +406,7 @@ def show_recognition_individual_tab():
     st.subheader("🚫 Employees With Zero Awards")
 
     all_employees = df["Employee Name"].unique()
-    awarded_employees = df["Employee Name"].unique()
+    awarded_employees = df["Employee Name"].unique()  # currently same; zero list will be empty
 
     zero_awards = list(set(all_employees) - set(awarded_employees))
 
