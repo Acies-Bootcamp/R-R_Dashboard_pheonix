@@ -1,261 +1,307 @@
-import streamlit as st
+import os
+import re
+import numpy as np
 import pandas as pd
+import streamlit as st
 import plotly.express as px
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
-from textblob import TextBlob   # <-- SENTIMENT ANALYSIS
+from nltk.sentiment import SentimentIntensityAnalyzer
+import nltk
+from collections import Counter
 
-# ==============================
-# 🎨 Color Palette
-# ==============================
-COLOR_PALETTE = ['#A7C7E7', '#F4C2C2', '#C3E6CB', '#FFFACD', '#D8BFD8']
+try:
+    import google.generativeai as genai
+    GEMINI_OK = True
+except ImportError:
+    GEMINI_OK = False
 
-# ==============================
-# 🧩 Load Data
-# ==============================
+try:
+    nltk.data.find("sentiment/vader_lexicon.zip")
+except LookupError:
+    nltk.download("vader_lexicon")
+
+_WORDCLOUD_OK = True
+try:
+    from wordcloud import WordCloud
+    import matplotlib.pyplot as plt
+except Exception:
+    _WORDCLOUD_OK = False
+
+
+# ================= GLASS UI =================
+glass_css = """
+<style>
+.metric-card {
+  background: rgba(255,255,255,0.25);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px 0 rgba(31,38,135,0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.18);
+  padding: 28px 20px 16px 20px;
+  margin-bottom: 24px;
+  text-align:center;
+}
+</style>
+"""
+st.markdown(glass_css, unsafe_allow_html=True)
+
+
+# ================= COLUMN KEYS =================
+COLS = {
+    "timestamp": "Timestamp",
+    "team": "Team Name ",
+    "aware_earlier": "Are you aware of the earlier R&R system?",
+    "earlier_rating": "How would you rate your overall experience with the earlier R&R system?",
+    "earlier_like": "What did you like most about the earlier R&R system?",
+    "engaging": "Which version of the R&R program do you find more engaging?",
+    "kudos_special": "Did seeing awards in kudos corner feel as special as hearing them announced in All Hands?",
+    "comments_earlier": "Any other comments about the earlier R&R system?",
+    "have_current": "Have you ever received or given an award in the current Kudos Bot system?",
+    "like_current": "What do you like most about the current R&R system?",
+    "which_awards": "Which award(s) have you received?",
+    "improve_current": "What improvements would you like to see in the current R&R system?",
+    "comments_any": "Any additional comments or suggestions?"
+}
+
+
+# ================= LOAD SURVEY =================
 @st.cache_data
 def load_survey_data():
     sheet_key = "1KSuP5YlzyI1jdVTMMu5v7MLyzvP9Emr3Fo94BsiSFo0"
-    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_key}/export?format=csv"
-    
-    df = pd.read_csv(csv_url, on_bad_lines='skip', engine='python', encoding='utf-8')
-    df.columns = df.columns.str.strip().str.replace('\n', ' ').str.replace('\r', '')
+    df = pd.read_csv(
+        f"https://docs.google.com/spreadsheets/d/{sheet_key}/export?format=csv",
+        on_bad_lines="skip",
+        encoding="utf-8"
+    )
+    df.columns = df.columns.str.strip().str.replace("\n", " ").str.replace("\r", "")
     return df
 
 
-# ==============================
-# 🎨 Helper: Safe Column Finder
-# ==============================
-def find_column(df, keyword):
-    cols = [c for c in df.columns if keyword.lower() in c.lower()]
-    if cols:
-        return cols[0]
+def clean_text(x):
+    return "" if pd.isna(x) else str(x).strip()
+
+
+def parse_awards(cell):
+    text = clean_text(cell)
+    if not text:
+        return []
+    parts = re.split(r"[,/|;]", text)
+    return [
+        p.strip()
+        for p in parts
+        if p.strip().lower() not in {"na", "none", "no award", "no award yet", "-", ""}
+    ]
+
+
+def earlier_rating_score(df):
+    s = pd.to_numeric(df[COLS["earlier_rating"]], errors="coerce")
+    return float((s.mean() / 3) * 100) if not s.dropna().empty else np.nan
+
+
+def score_sentiment_texts(texts):
+    texts = [clean_text(t) for t in texts if clean_text(t)]
+    if not texts:
+        return np.nan
+    sia = SentimentIntensityAnalyzer()
+    vals = [(sia.polarity_scores(t)["compound"] + 1) / 2 * 100 for t in texts]
+    return float(np.mean(vals))
+
+
+def current_sentiment_score(df):
+    fields = ["like_current", "improve_current", "comments_any"]
+    texts = []
+    for key in fields:
+        texts.extend(df[COLS[key]].astype(str).tolist())
+    return score_sentiment_texts(texts)
+
+
+# ================= FIXED: REAL RECOGNITION REACH =================
+def recognition_reach_rate(df):
+    col_aw = COLS["which_awards"]
+
+    # Count only those who ACTUALLY received an award
+    has_awards = df[col_aw].apply(lambda x: len(parse_awards(x)) > 0)
+
+    total = len(df)
+    if total == 0:
+        return np.nan
+
+    return float(has_awards.sum() / total * 100)
+
+
+# ================= WORDCLOUD =================
+def show_wordcloud(texts, title, colormap="viridis", phrase_cloud=False):
+    if not _WORDCLOUD_OK:
+        st.info("WordCloud not available.")
+        return
+
+    texts = [clean_text(t) for t in texts if t]
+    if not texts:
+        st.info(f"No data for {title}")
+        return
+
+    if phrase_cloud:
+        trimmed = [" ".join(t.split()[:10]) for t in texts]
+        freq = Counter(trimmed)
+        wc = WordCloud(
+            width=1100, height=400,
+            background_color="white",
+            colormap=colormap
+        ).generate_from_frequencies(freq)
+        fig, ax = plt.subplots(figsize=(14, 6))
     else:
-        st.error(f"⚠️ Could not find a column containing: '{keyword}'")
-        st.write("🧾 Available columns:", list(df.columns))
-        st.stop()
+        wc = WordCloud(
+            width=1200, height=500,
+            background_color="white",
+            colormap=colormap
+        ).generate(" ".join(texts))
+        fig, ax = plt.subplots(figsize=(12, 5))
+
+    ax.imshow(wc, interpolation="bilinear")
+    ax.axis("off")
+    ax.set_title(title)
+    st.pyplot(fig)
 
 
-# ==============================
-# 🎨 Sentiment Helper
-# ==============================
-def sentiment_score(text):
-    if pd.isna(text) or text.strip() == "":
-        return 0
-    return TextBlob(text).sentiment.polarity  # -1 to +1
+# ================= KPI (NO DECIMALS) =================
+def safe_metric(v, label, help_text):
+    display = "–" if np.isnan(v) else str(int(round(v)))
+    st.markdown(
+        f'<div class="metric-card"><h4>{label}</h4>'
+        f'<p title="{help_text}"><b>{display}</b></p></div>',
+        unsafe_allow_html=True
+    )
 
 
-# ==============================
-# 🎨 Main Summary Overview
-# ==============================
-def show_summary_overview():
-
-    st.markdown("""
-        <h2 style='text-align:center; color:#2E4053;'>
-            💎 Overall Effectiveness Snapshot
-        </h2>
-        <p style='text-align:center; color:gray; font-size:16px;'>
-            Comparing engagement, awareness, and satisfaction between the <b>Earlier Town Hall R&R</b> 
-            and the <b>Current Kudos Bot System</b>.
-        </p>
-    """, unsafe_allow_html=True)
+# ================= MAIN DASHBOARD =================
+def show_rr_dashboard():
+    st.title("R&R Metrics Dashboard")
 
     df = load_survey_data()
 
-    # ==============================
-    # 🎯 KPI CARDS (Original)
-    # ==============================
-    col1, col2, col3 = st.columns(3)
+    # USE ALL PARTICIPANTS (FIX)
+    survey_participants = df
 
-    # --- Avg Rating ---
-    rating_col = find_column(df, "rate your overall experience")
-    avg_rating = df[rating_col].dropna().astype(float).mean().round(1)
+    # KPI VALUES
+    earlier_score = earlier_rating_score(survey_participants)
+    current_score = current_sentiment_score(survey_participants)
+    reach = recognition_reach_rate(survey_participants)
+    lift = ((current_score - earlier_score) / earlier_score) * 100 if earlier_score else np.nan
 
-    with col1:
-        st.markdown(f"""
-            <div style='background:linear-gradient(135deg,#A7C7E7,#D6EAF8);
-                        padding:20px;border-radius:15px;text-align:center;
-                        box-shadow:0px 4px 10px rgba(0,0,0,0.1);'>
-                <h4 style='color:#2E4053;'>⭐ Avg. Rating (Earlier R&R)</h4>
-                <h1 style='color:#154360;font-size:42px;'>{avg_rating} / 3</h1>
-                <p style='color:gray;font-size:14px;'>Average satisfaction score</p>
-            </div>
-        """, unsafe_allow_html=True)
+    # KPI CARDS
+    k = st.columns(4)
 
-    # --- Participation ---
-    award_col = find_column(df, "received or given an award")
-    received_award = (df[award_col].astype(str).str.lower() == 'yes').mean() * 100
+    with k[0]:
+        safe_metric(earlier_score, "Earlier System Happiness Score",
+                    "How happy people were with the old Town Hall R&R")
 
-    with col2:
-        st.markdown(f"""
-            <div style='background:linear-gradient(135deg,#A9DFBF,#D5F5E3);
-                        padding:20px;border-radius:15px;text-align:center;
-                        box-shadow:0px 4px 10px rgba(0,0,0,0.1);'>
-                <h4 style='color:#2E4053;'>🏅 Participation in Current R&R</h4>
-                <h1 style='color:#145A32;font-size:42px;'>{received_award:.1f}%</h1>
-                <p style='color:gray;font-size:14px;'>Users who have given/received awards</p>
-            </div>
-        """, unsafe_allow_html=True)
+    with k[1]:
+        safe_metric(current_score, "Current System Happiness Score",
+                    "How happy people are with the Kudos Bot system")
 
-    # --- Awareness ---
-    aware_col = find_column(df, "aware of the earlier")
-    aware_pct = round((df[aware_col].astype(str).str.lower() == 'yes').mean() * 100, 1)
+    with k[2]:
+        safe_metric(reach, "How Many People Got Recognized",
+                    "Percentage of ALL survey participants who actually received an award")
 
-    with col3:
-        st.markdown(f"""
-            <div style='background:linear-gradient(135deg,#F5B7B1,#FADBD8);
-                        padding:20px;border-radius:15px;text-align:center;
-                        box-shadow:0px 4px 10px rgba(0,0,0,0.1);'>
-                <h4 style='color:#2E4053;'>🎓 Awareness of Earlier System</h4>
-                <h1 style='color:#7B241C;font-size:42px;'>{aware_pct}%</h1>
-                <p style='color:gray;font-size:14px;'>Respondents aware of earlier R&R</p>
-            </div>
-        """, unsafe_allow_html=True)
+    with k[3]:
+        safe_metric(lift, "Improvement From Earlier System",
+                    "Increase or drop in happiness")
 
-    # =======================================================
-    # 🎯 SENTIMENT KPI CARDS (NEW — INTEGRATED HERE)
-    # =======================================================
+    st.divider()
 
-    # Identify columns for sentiment
-    earlier_like_col = find_column(df, "What did you like most about the earlier")
-    current_like_col = find_column(df, "What do you like most about the current")
-    improve_col = find_column(df, "improvements would you like to see")
+    # Engagement
+    st.subheader("Which version is more engaging?")
 
-    # Compute sentiment
-    df["Earlier_Sentiment"] = df[earlier_like_col].apply(sentiment_score)
-    df["Current_Sentiment"] = df[current_like_col].apply(sentiment_score)
-    df["Improvement_Sentiment"] = df[improve_col].apply(sentiment_score)
+    map_eng = {
+        "Earlier system (Town Hall via Google Meet)": "Earlier",
+        "Current system (Kudos Bot in Chat)": "Current",
+        "Both equally engaging": "Both",
+    }
 
-    earlier_sent_avg = df["Earlier_Sentiment"].mean()
-    current_sent_avg = df["Current_Sentiment"].mean()
-    improve_sent_avg = df["Improvement_Sentiment"].mean()
+    mapped = survey_participants[COLS["engaging"]].map(lambda x: map_eng.get(str(x).strip(), "Other"))
 
-    st.markdown("""
-        <h3 style='text-align:center; margin-top:40px; color:#2E4053;'>
-            🧠 Sentiment Overview — Emotional Perception of Each System
-        </h3>
-    """, unsafe_allow_html=True)
+    df_eng = pd.DataFrame({
+        "Engaging": ["Earlier", "Current"],
+        "Count": [(mapped == "Earlier").sum(), (mapped == "Current").sum()]
+    })
 
-    s1, s2, s3 = st.columns(3)
-
-    with s1:
-        st.markdown(f"""
-            <div style='background:linear-gradient(135deg,#AED6F1,#D6EAF8);
-                        padding:20px;border-radius:15px;text-align:center;
-                        box-shadow:0px 4px 12px rgba(0,0,0,0.1);'>
-                <h4 style='color:#1B4F72;'>Earlier System Sentiment</h4>
-                <h1 style='color:#154360;font-size:42px;'>{earlier_sent_avg:.2f}</h1>
-                <p style='color:#566573;font-size:14px;'>Emotion Score (-1 to +1)</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with s2:
-        st.markdown(f"""
-            <div style='background:linear-gradient(135deg,#A3E4D7,#D5F5E3);
-                        padding:20px;border-radius:15px;text-align:center;
-                        box-shadow:0px 4px 12px rgba(0,0,0,0.1);'>
-                <h4 style='color:#0E6251;'>Current System Sentiment</h4>
-                <h1 style='color:#117864;font-size:42px;'>{current_sent_avg:.2f}</h1>
-                <p style='color:#566573;font-size:14px;'>Emotion Score (-1 to +1)</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-    with s3:
-        st.markdown(f"""
-            <div style='background:linear-gradient(135deg,#F5B7B1,#FADBD8);
-                        padding:20px;border-radius:15px;text-align:center;
-                        box-shadow:0px 4px 12px rgba(0,0,0,0.1);'>
-                <h4 style='color:#7B241C;'>Improvement Sentiment</h4>
-                <h1 style='color:#A93226;font-size:42px;'>{improve_sent_avg:.2f}</h1>
-                <p style='color:#566573;font-size:14px;'>Lower = More Frustration</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<hr>", unsafe_allow_html=True)
-
-
-    # ==============================
-    # 🥇 Preference Pie Chart
-    # ==============================
-    st.markdown("""
-        <h3 style='color:#1F618D;'>🎯 Which version of the R&R Program is more engaging?</h3>
-    """, unsafe_allow_html=True)
-
-    pref_col = find_column(df, "find more engaging")
-    pref_data = df[pref_col].value_counts().reset_index()
-    pref_data.columns = ['R&R Version', 'Responses']
-
-    fig_pref = px.pie(
-        pref_data,
-        values='Responses',
-        names='R&R Version',
-        color='R&R Version',
-        color_discrete_map={
-            'Earlier system (Town Hall via Google Meet)': '#5B9BD5',
-            'Current system (Kudos Bot in Chat)': '#E74C3C',
-            'Both equally engaging': '#F4D03F'
-        },
-        hole=0.45
+    fig_eng = px.pie(
+        df_eng, names="Engaging", values="Count",
+        title="Earlier vs Current — Engagement Preference",
+        color="Engaging",
+        color_discrete_map={"Earlier": "#1f77b4", "Current": "#ff4136"}
     )
+    st.plotly_chart(fig_eng, use_container_width=True)
 
-    st.plotly_chart(fig_pref, use_container_width=True)
+    st.info(f"Both Equally Engaging: {(mapped == 'Both').sum()} respondents")
 
-    # ==============================
-    # 🔶 USER EXPERIENCE COMPARISON
-    # ==============================
+    st.divider()
 
-    st.markdown("""
-        <h2 style='color:#2874A6;'>🔶 2️⃣ USER EXPERIENCE COMPARISON</h2>
-    """, unsafe_allow_html=True)
+    # Awards
+    awards = []
+    for v in survey_participants[COLS["which_awards"]].tolist():
+        awards.extend(parse_awards(v))
 
-    col1, col2 = st.columns(2)
+    if awards:
+        counts = pd.Series(awards).value_counts().reset_index()
+        counts.columns = ["Award", "Recognitions"]
+        fig_aw = px.bar(
+            counts, x="Award", y="Recognitions",
+            title="Recognitions by Award Type"
+        )
+        st.plotly_chart(fig_aw, use_container_width=True)
 
-    earlier_col = find_column(df, "What did you like most about the earlier")
-    current_col = find_column(df, "What do you like most about the current")
+    st.divider()
 
-    # WC Earlier
-    text_earlier = " ".join(df[earlier_col].dropna().astype(str))
-    wc1 = WordCloud(width=800, height=450, background_color='white', colormap='Blues').generate(text_earlier)
+    # =====================================================
+    # WORD MAPS — DIFFERENT COLORS + REMOVE NAN/NO/NONE
+    # =====================================================
+    st.subheader("Word Maps — Earlier vs Current System")
 
-    with col1:
-        st.markdown("#### 🕰️ Earlier R&R Likes")
-        fig, ax = plt.subplots(figsize=(8, 4.5))
-        ax.imshow(wc1, interpolation='bilinear')
-        ax.axis('off')
-        st.pyplot(fig)
+    # Earlier likes
+    earlier_likes = [
+        t.strip() for t in survey_participants[COLS["earlier_like"]].astype(str).tolist()
+        if t.strip().lower() not in {"na", "none", "no", "-", "nil", "nan", ""}
+    ]
 
-    # WC Current
-    text_curr = " ".join(df[current_col].dropna().astype(str))
-    wc2 = WordCloud(width=800, height=450, background_color='white', colormap='Greens').generate(text_curr)
+    # Current likes
+    current_likes = [
+        t.strip() for t in survey_participants[COLS["like_current"]].astype(str).tolist()
+        if t.strip().lower() not in {"na", "none", "no", "-", "nil", "nan", ""}
+    ]
 
-    with col2:
-        st.markdown("#### ⚡ Current R&R Likes")
-        fig2, ax2 = plt.subplots(figsize=(8, 4.5))
-        ax2.imshow(wc2, interpolation='bilinear')
-        ax2.axis('off')
-        st.pyplot(fig2)
+    c1, c2 = st.columns(2)
+    with c1:
+        show_wordcloud(earlier_likes, "Earlier System — Likes", colormap="Blues")
+    with c2:
+        show_wordcloud(current_likes, "Current System — Likes", colormap="Oranges")
 
-    # ==============================
-    # Specialness Bar Chart
-    # ==============================
-    st.markdown("### 💭 Did Kudos Corner Feel as Special as All Hands?")
-    
-    special_col = find_column(df, "kudos corner")
-    special_data = df[special_col].value_counts().reset_index()
-    special_data.columns = ['Response', 'Count']
+    st.divider()
 
-    fig_special = px.bar(
-        special_data, x='Response', y='Count', text='Count',
-        color='Response',
-        color_discrete_sequence=['#A7C7E7', '#F4C2C2', '#FFFACD']
-    )
-    st.plotly_chart(fig_special, use_container_width=True)
+    # =====================================================
+    # IMPROVEMENT SUGGESTIONS — REMOVE USELESS TEXT
+    # =====================================================
+    st.subheader("Key Improvement Suggestions")
 
-    
+    raw_improvements = survey_participants[COLS["improve_current"]].astype(str).tolist()
+
+    bad_words = {
+        "na", "n/a", "none", "no", "nil", "nan", "-", "",
+        "no suggestions", "no suggestion", "no comments",
+        "nothing", "not applicable", "null"
+    }
+
+    improvements = [
+        t.strip()
+        for t in raw_improvements
+        if t.strip().lower() not in bad_words
+    ]
+
+    show_wordcloud(improvements, "Improvement Suggestions", colormap="Purples", phrase_cloud=True)
+
+    st.caption("Wordclouds cleaned: NAN/none/no/nil removed, each section uses different colors.")
 
 
-# ==============================
-# Run
-# ==============================
+# RUN
 if __name__ == "__main__":
-    show_summary_overview()
+    show_rr_dashboard()
