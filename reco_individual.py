@@ -25,96 +25,82 @@ def show_recognition_individual_tab():
     st.header("Individual Recognition Analysis")
 
     # ============================================================
-    # FILTERS SECTION
+    # FILTER SECTION — HORIZONTAL LIKE YOUR SCREENSHOT
     # ============================================================
-    st.markdown("### Filters")
 
-    years = sorted(df["year"].dropna().unique())
-    year_options = ["All"] + [str(int(y)) for y in years]
+    st.markdown("### 🔎 Filters")
 
-    award_types = sorted(df["New_Award_title"].dropna().unique())
-    award_options = ["All"] + list(award_types)
+    # ----------- YEAR FILTER BASE -----------
+    all_years = sorted(df["year"].dropna().unique())
+    year_options = ["All"] + [str(int(y)) for y in all_years]
 
-    teams = sorted(df["Team name"].dropna().unique())
-    employees = sorted(df["Employee Name"].dropna().unique())
+    # FILTER ROW (Horizontal UI)
+    f1, f2, f3, f4, f5 = st.columns([1.2, 1.2, 1.2, 1.2, 0.6])
 
-    if "reset_filters" not in st.session_state:
-        st.session_state.reset_filters = False
-
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 0.4])
-
-    if st.session_state.reset_filters:
-        default_years = ["All"]
-        default_awards = ["All"]
-        default_team = "All"
-        default_employee = "All"
-    else:
-        default_years = st.session_state.get("year_filter", ["All"])
-        default_awards = st.session_state.get("award_filter", ["All"])
-        default_team = st.session_state.get("team_filter", "All")
-        default_employee = st.session_state.get("emp_filter", "All")
-
-    with col1:
+    # ------------------ YEAR ------------------
+    with f1:
         selected_years = st.multiselect(
-            "Year(s)", year_options, default=default_years, key="year_filter"
+            "Select Year(s)",
+            year_options,
+            default=["All"]
         )
 
-    with col2:
-        selected_awards = st.multiselect(
-            "Award Type(s)", award_options, default=default_awards, key="award_filter"
-        )
-
-    with col3:
-        selected_team = st.selectbox(
-            "Select Team (optional)",
-            ["All"] + teams,
-            index=(["All"] + teams).index(default_team)
-            if default_team in ["All"] + teams else 0,
-            key="team_filter",
-        )
-
-    with col4:
-        selected_employee = st.selectbox(
-            "Select Employee (optional)",
-            ["All"] + employees,
-            index=(["All"] + employees).index(default_employee)
-            if default_employee in ["All"] + employees else 0,
-            key="emp_filter",
-        )
-
-    with col5:
-        if st.button("Clear Filters"):
-            st.session_state.reset_filters = True
-            for key in ["year_filter", "award_filter", "team_filter", "emp_filter"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.success("All filters cleared! Showing complete data.")
-            st.rerun()
-
-    if st.session_state.reset_filters:
-        st.session_state.reset_filters = False
-
-    # ---------------- APPLY FILTERS ----------------
-    filtered_df = df.copy()
-
+    # Create temporary DF based on earlier filters
+    temp_df = df.copy()
     if "All" not in selected_years:
-        filtered_df = filtered_df[filtered_df["year"].isin([int(y) for y in selected_years])]
+        temp_df = temp_df[temp_df["year"].isin([int(y) for y in selected_years])]
+
+    # ------------------ AWARD TYPE ------------------
+    with f2:
+        award_options = ["All"] + sorted(temp_df["New_Award_title"].dropna().unique())
+        selected_awards = st.multiselect(
+            "Select Award Title",
+            award_options,
+            default=["All"]
+        )
 
     if "All" not in selected_awards:
-        filtered_df = filtered_df[filtered_df["New_Award_title"].isin(selected_awards)]
+        temp_df = temp_df[temp_df["New_Award_title"].isin(selected_awards)]
+
+    # ------------------ TEAM ------------------
+    with f3:
+        team_options = ["All"] + sorted(temp_df["Team name"].dropna().unique())
+        selected_team = st.selectbox(
+            "Select Team",
+            team_options
+        )
 
     if selected_team != "All":
-        filtered_df = filtered_df[filtered_df["Team name"] == selected_team]
+        temp_df = temp_df[temp_df["Team name"] == selected_team]
+
+    # ------------------ EMPLOYEE ------------------
+    with f4:
+        employee_options = ["All"] + sorted(temp_df["Employee Name"].dropna().unique())
+        selected_employee = st.selectbox(
+            "Select Employee",
+            employee_options
+        )
 
     if selected_employee != "All":
-        filtered_df = filtered_df[filtered_df["Employee Name"] == selected_employee]
+        temp_df = temp_df[temp_df["Employee Name"] == selected_employee]
+
+    # ---------------- CLEAR BUTTON ----------------
+    with f5:
+        st.write("")
+        st.write("")
+        if st.button("Clear Filters"):
+            st.rerun()
+
+    # Final filtered data
+    filtered_df = temp_df.copy()
 
     st.markdown("---")
 
     # ============================================================
-    # KPI METRICS SECTION (AVG AWARDS REMOVED)
+    # KPI SECTION
     # ============================================================
-    st.markdown("### Key Performance Indicators Based Upon Filters")
+
+    st.markdown("### 📊 Key Performance Indicators Based Upon Filters")
 
     total_employees = filtered_df["Employee Name"].nunique()
     total_awards = len(filtered_df)
@@ -134,9 +120,10 @@ def show_recognition_individual_tab():
     st.markdown("---")
 
     # ============================================================
-    # CHART 1: Top Performers (SUNBURST)
+    # CHART 1: Top Performers SUNBURST
     # ============================================================
-    st.subheader("Most Awards Received For Individuals")
+
+    st.subheader("🌟 Most Awards Received For Individuals")
 
     top_ind = (
         filtered_df.groupby(["Employee Name", "Team name"])["New_Award_title"]
@@ -164,7 +151,8 @@ def show_recognition_individual_tab():
     # ============================================================
     # CHART 3: Histogram
     # ============================================================
-    st.subheader("Recognition Distribution Histogram")
+
+    st.subheader("📌 Recognition Distribution Histogram")
 
     award_counts_df = employee_awards.reset_index(name="Awards Count")
 
@@ -175,7 +163,6 @@ def show_recognition_individual_tab():
         title="Employee Award Count Distribution"
     )
     fig3.update_layout(height=400)
-
     st.plotly_chart(fig3, use_container_width=True)
 
     st.markdown("---")
@@ -183,7 +170,8 @@ def show_recognition_individual_tab():
     # ============================================================
     # CHART 4: Treemap
     # ============================================================
-    st.subheader("Award Types by Top Performers (Treemap)")
+
+    st.subheader("🎯 Award Types by Top Performers (Treemap)")
 
     top_10 = employee_awards.nlargest(10).index
     top_df = filtered_df[filtered_df["Employee Name"].isin(top_10)]
@@ -212,11 +200,13 @@ def show_recognition_individual_tab():
     # ============================================================
     # TABLE 1: Top 20 Recipients
     # ============================================================
-    st.subheader("Top 20 Recipients - Detailed View")
+
+    st.subheader("🏆 Top 20 Recipients - Detailed View")
 
     top20 = (
         filtered_df.groupby(["Employee Name", "Team name"])
-        .agg({"New_Award_title": ["count", lambda x: ", ".join(x.unique()[:3])]}).reset_index()
+        .agg({"New_Award_title": ["count", lambda x: ", ".join(x.unique()[:3])]})
+        .reset_index()
     )
     top20.columns = ["Employee Name", "Team", "Total Awards", "Award Types (Sample)"]
     top20 = top20.sort_values("Total Awards", ascending=False).head(20)
@@ -230,9 +220,10 @@ def show_recognition_individual_tab():
     st.markdown("---")
 
     # ============================================================
-    # TABLE 2: Gap Analysis (LOW RECOGNITION ≤2)
+    # GAP ANALYSIS
     # ============================================================
-    st.subheader("Recognition Gap Analysis")
+
+    st.subheader("⚠ Recognition Gap Analysis")
 
     summary = (
         filtered_df.groupby("Employee Name")
@@ -253,13 +244,10 @@ def show_recognition_individual_tab():
         st.success("All employees received 3+ awards!")
 
     # ============================================================
-    # ADVANCED GAP ANALYSIS SECTION
+    # TEAM GAP ANALYSIS
     # ============================================================
 
-    # ---------------------------------------------
-    # 1️⃣ TEAM-LEVEL GAP ANALYSIS
-    # ---------------------------------------------
-    st.subheader("Team-Level Recognition Gaps")
+    st.subheader("📉 Team-Level Recognition Gaps")
 
     team_awards = df.groupby("Team name")["New_Award_title"].count().reset_index()
     team_size = df.groupby("Team name")["Employee Name"].nunique().reset_index()
@@ -284,10 +272,11 @@ def show_recognition_individual_tab():
         use_container_width=True
     )
 
-    # ---------------------------------------------
-    # 2️⃣ EMPLOYEES WITH ZERO AWARDS
-    # ---------------------------------------------
-    st.subheader("Employees With Zero Awards")
+    # ============================================================
+    # EMPLOYEES WITH ZERO AWARDS
+    # ============================================================
+
+    st.subheader("🚫 Employees With Zero Awards")
 
     all_employees = df["Employee Name"].unique()
     awarded_employees = df["Employee Name"].unique()
