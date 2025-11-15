@@ -1,14 +1,81 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import plotly.express as px
 import re
 import html
 
 # -----------------------
+# Global Glass / KPI CSS
+# -----------------------
+glass_css = """
+<style>
+/* KPI cards */
+.metric-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(180, 180, 180, 0.7);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.10);
+  text-align: center;
+}
+.metric-card h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 0.25rem;
+}
+.metric-card h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+/* KPI label + ? helper */
+.kpi-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.kpi-help {
+  font-size: 0.75rem;
+  color: #6b7280;
+  border-radius: 999px;
+  border: 1px solid #d4d4d8;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  background-color: #f9fafb;
+}
+
+/* Glass effect for all charts */
+.stPlotlyChart {
+  background: radial-gradient(circle at top left,
+                              rgba(255,255,255,0.8),
+                              rgba(243,244,246,0.98));
+  border-radius: 16px;
+  padding: 12px;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+/* Slightly darker Streamlit table text */
+.dataframe th {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+}
+</style>
+"""
+
+# -----------------------
 # Helpers
 # -----------------------
 def normalize_name(name):
-    if pd.isna(name): 
+    if pd.isna(name):
         return name
     name = str(name).strip().lower()
     name = re.sub(r"\s+", " ", name)
@@ -16,7 +83,6 @@ def normalize_name(name):
     return name
 
 def _find_amount_col(df: pd.DataFrame) -> str | None:
-    """Auto-detect the amount column by common names or heuristics."""
     candidates = [
         "Coupon Amount", "Coupon Amount (₹)", "Coupon amount",
         "Coupon", "Amount", "Budget", "Allocation",
@@ -26,7 +92,6 @@ def _find_amount_col(df: pd.DataFrame) -> str | None:
     for cand in candidates:
         if cand.lower() in lower_cols:
             return lower_cols[cand.lower()]
-    # heuristic fallback
     for c in df.columns:
         lc = c.lower()
         if any(k in lc for k in ["coupon", "amount", "allocation", "budget"]):
@@ -34,12 +99,6 @@ def _find_amount_col(df: pd.DataFrame) -> str | None:
     return None
 
 def _to_number(series: pd.Series) -> pd.Series:
-    """
-    Safe currency parser:
-    - strips ₹ and commas
-    - extracts first numeric token like -1234.56
-    - returns 0.0 if none found
-    """
     s = series.astype(str)
     s = s.str.replace("\u20b9", "", regex=False)  # ₹
     s = s.str.replace(",", "", regex=False)
@@ -47,38 +106,11 @@ def _to_number(series: pd.Series) -> pd.Series:
     extracted = s.str.extract(r"(-?\d+(?:\.\d+)?)", expand=False)
     return pd.to_numeric(extracted, errors="coerce").fillna(0.0)
 
-def _fmt_currency(x: float) -> str:
-    try:
-        return f"₹{x:,.0f}"
-    except Exception:
-        return "₹0"
-
-def _metric_with_hover(label: str, value: str, tooltip: str):
-    """
-    Render a KPI-like tile with a native browser tooltip (title attr).
-    """
-    safe_tooltip = html.escape(tooltip).replace("\n", "&#10;")
-    st.markdown(
-        f"""
-<div title="{safe_tooltip}" style="
-    border:1px solid #eee; border-radius:10px; padding:12px 16px;
-    background:#fafafa;">
-  <div style="font-size:0.9rem; color:#6b7280;">{html.escape(label)}</div>
-  <div style="font-size:1.6rem; font-weight:700; color:#111827;">{html.escape(value)}</div>
-  <div style="font-size:0.75rem; color:#9CA3AF;">Hover for breakdown</div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-# -----------------------
-# Load & preprocess
-# -----------------------
 def load_and_process_data():
     url = "https://docs.google.com/spreadsheets/d/1xVpXomZBOyIeyvpyDjXQlSEIfU35v6j0jkhdaETm4-Q/export?format=xlsx"
     df = pd.read_excel(url)
 
-    # Month/Year -> Date
+    # Month / Year -> Date
     month_map = {
         'January': 1, 'February': 2, 'March': 3, 'April': 4,
         'May': 5, 'June': 6, 'July': 7, 'August': 8,
@@ -87,9 +119,12 @@ def load_and_process_data():
     df['Month'] = df['Month'].astype(str).str.strip().str.capitalize()
     df['year'] = pd.to_numeric(df['year'], errors='coerce')
     df['Month_Num'] = df['Month'].map(month_map)
-    df['Date'] = pd.to_datetime(dict(year=df['year'], month=df['Month_Num'], day=1), errors='coerce')
+    df['Date'] = pd.to_datetime(
+        dict(year=df['year'], month=df['Month_Num'], day=1),
+        errors='coerce'
+    )
 
-    # Normalize team names
+    # Team name normalisation / mapping
     team_mapping = {
         'greenmath': 'Greenmath',
         'edgecore': 'Edgecore',
@@ -103,65 +138,83 @@ def load_and_process_data():
         .str.title()
     )
 
-    # Robust Amount column
+    # Amount parsing
     amt_col = _find_amount_col(df)
     df['Amount'] = _to_number(df[amt_col]) if amt_col else 0.0
 
     return df
 
+def clean_teamname_df(df, column='Team name'):
+    df_cleaned = df.dropna(subset=[column]).copy()
+    df_cleaned = df_cleaned[
+        ~df_cleaned[column].astype(str).str.strip().str.lower().eq('nan')
+    ]
+    df_cleaned = df_cleaned[
+        df_cleaned[column].astype(str).str.strip() != ''
+    ]
+    return df_cleaned
+
 # -----------------------
 # Trend builder
 # -----------------------
 def build_award_trend(
-    df, award_types, selected_years, time_period,
-    team_mode, selected_team, top_team_count, kudos_corner=False
+    df,
+    selected_years,
+    time_period,
+    team_mode,
+    selected_team,
+    top_team_count,
+    employee_team_map=None,
 ):
     dfs = []
 
-    # Kudos Corner filter tolerant to 'Nominated' field variants
-    if kudos_corner:
-        nom_col = next((c for c in ['Nominated', 'Nominated In', 'NominatedIn'] if c in df.columns), None)
-        if nom_col:
-            df = df[df[nom_col].astype(str).str.contains("kudos", case=False, na=False)]
+    # --- Team Award ---
+    team_award_df = df[df['New_Award_title'] == 'Team Award'].copy()
+    team_award_df = clean_teamname_df(team_award_df, column='Team name')
+    teams = sorted(team_award_df['Team name'].dropna().unique())
 
-    # TEAM AWARD
-    if "Team Award" in award_types:
-        team_award_df = df[df['New_Award_title'] == 'Team Award'].copy()
-        teams = sorted(team_award_df['Team name'].dropna().unique())
+    if team_mode == "All Teams":
+        active_teams = teams
+    elif team_mode == "Single Team":
+        active_teams = [selected_team] if (selected_team and selected_team != "All Teams") else teams
+    elif team_mode == "Most Couponed Teams":
+        top_teams = team_award_df['Team name'].value_counts().head(top_team_count).index.tolist()
+        active_teams = top_teams
+    else:
+        active_teams = teams
 
-        if team_mode == "All Teams":
-            active_teams = teams
-        elif team_mode == "Single Team":
-            active_teams = [selected_team] if (selected_team and selected_team != "All Teams") else teams
-        elif team_mode == "Top Teams":
-            top_teams = team_award_df['Team name'].value_counts().head(top_team_count).index.tolist()
-            active_teams = top_teams
+    filtered_team = team_award_df[
+        (team_award_df['year'].isin(selected_years)) &
+        (team_award_df['Team name'].isin(active_teams))
+    ].copy()
+    filtered_team = clean_teamname_df(filtered_team, column='Team name')
+    if not filtered_team.empty:
+        filtered_team['Award_Type'] = 'Team Award'
+        dfs.append(filtered_team)
 
-        filtered = team_award_df[
-            (team_award_df['year'].isin(selected_years)) &
-            (team_award_df['Team name'].isin(active_teams))
-        ].copy()
-        filtered['Award_Type'] = 'Team Award'
-        dfs.append(filtered)
-
-    # AWESOME AWARD restricted to Greenmath/Edgecore employee teams
-    if "Awesome Award" in award_types:
-        greenmath_employees = df[df['Team name'].str.contains('green', case=False, na=False)]
-        edgecore_employees = df[df['Team name'].str.contains('edgecore', case=False, na=False)]
-        filtered_employees = pd.concat([greenmath_employees, edgecore_employees], ignore_index=True)
+    # --- Awesome Award mapped to Greenmath/Edgecore ---
+    if employee_team_map is not None and not employee_team_map.empty:
+        filtered_employees = employee_team_map.copy()
+    else:
+        gm = df[df['Team name'].str.contains('greenmath', case=False, na=False)]
+        ec = df[df['Team name'].str.contains('edgecore', case=False, na=False)]
+        filtered_employees = pd.concat([gm, ec], ignore_index=True)
         filtered_employees = filtered_employees[['Employee Name', 'Team name']].drop_duplicates()
 
-        awesome_awards_raw = df[df['New_Award_title'] == 'Awesome Award'].copy()
-        mapped = awesome_awards_raw.merge(
-            filtered_employees, on='Employee Name', how='left', suffixes=('', '_emp')
-        )
-        mapped['Team name Final'] = mapped['Team name_emp'].fillna(mapped['Team name'])
-        mapped = mapped[
-            mapped['Team name Final'].str.contains('green|edgecore', case=False, na=False) &
-            mapped['year'].isin(selected_years)
-        ].copy()
-        mapped['Team name'] = mapped['Team name Final']
-        mapped.drop(columns=['Team name_emp', 'Team name Final'], errors='ignore', inplace=True)
+    awesome_awards_raw = df[df['New_Award_title'] == 'Awesome Award'].copy()
+    mapped = awesome_awards_raw.merge(
+        filtered_employees,
+        on='Employee Name',
+        how='left',
+        suffixes=('', '_mapped')
+    )
+    mapped['Team name'] = mapped['Team name_mapped'].fillna(mapped['Team name'])
+    mapped = mapped[
+        mapped['Team name'].str.contains('greenmath|edgecore', case=False, na=False) &
+        mapped['year'].isin(selected_years)
+    ].copy()
+    mapped = clean_teamname_df(mapped, column='Team name')
+    if not mapped.empty:
         mapped['Award_Type'] = 'Awesome Award'
         dfs.append(mapped)
 
@@ -169,14 +222,16 @@ def build_award_trend(
         return None, None
 
     combined_df = pd.concat(dfs, ignore_index=True)
+    combined_df = clean_teamname_df(combined_df, column='Team name')
 
-    # Period
     if time_period == "Monthly":
         combined_df['Period'] = combined_df['Date'].dt.to_period('M').dt.to_timestamp()
     elif time_period == "Quarterly":
         combined_df['Period'] = combined_df['Date'].dt.to_period('Q').dt.to_timestamp()
     else:
         combined_df['Period'] = combined_df['Date'].dt.to_period('Y').dt.to_timestamp()
+
+    combined_df = combined_df.dropna(subset=['Period'])
 
     trend_df = (
         combined_df
@@ -187,191 +242,483 @@ def build_award_trend(
     return trend_df, combined_df
 
 # -----------------------
-# KPIs (Awards Count has hover tooltip)
+# Filter by award type (for KPIs)
 # -----------------------
-def display_budget_kpis(filtered_df: pd.DataFrame):
-    total_amount = float(filtered_df['Amount'].sum()) if 'Amount' in filtered_df.columns else 0.0
-    total_awards = int(len(filtered_df))
-    avg_amount = (total_amount / total_awards) if total_awards > 0 else 0.0
-    team_counts = int(filtered_df['Team name'].nunique())
+def filter_by_award_type(df, award_type_filter):
+    if df is None or df.empty:
+        return df
 
-    # Top team by allocation
-    if total_awards > 0 and 'Amount' in filtered_df.columns:
-        by_team = filtered_df.groupby('Team name', as_index=False)['Amount'].sum()
-        if not by_team.empty:
-            top_row = by_team.sort_values('Amount', ascending=False).iloc[0]
-            top_team = str(top_row['Team name'])
-            top_amt = float(top_row['Amount'])
-            share = (top_amt / total_amount * 100.0) if total_amount > 0 else 0.0
-        else:
-            top_team, top_amt, share = "—", 0.0, 0.0
+    if award_type_filter in [
+        "All Awards (Team + Awesome)",
+        "Both Team & Awesome",
+        "All"
+    ]:
+        return df[df['New_Award_title'].isin(['Team Award', 'Awesome Award'])]
+    elif award_type_filter == "Team Award only":
+        return df[df['New_Award_title'] == 'Team Award']
+    elif award_type_filter == "Awesome Award only":
+        return df[df['New_Award_title'] == 'Awesome Award']
     else:
-        top_team, top_amt, share = "—", 0.0, 0.0
+        return df[df['New_Award_title'].isin(['Team Award', 'Awesome Award'])]
 
-    # Build tooltip breakdown for Awards Count: by New_Award_title
-    if 'New_Award_title' in filtered_df.columns and total_awards > 0:
-        counts = (
-            filtered_df['New_Award_title']
-            .fillna('Unknown')
-            .value_counts()
-            .sort_values(ascending=False)
-        )
-        lines = [f"{k}: {v}" for k, v in counts.items()]
-        tooltip_text = "Awards breakdown\\n" + "\\n".join(lines[:25])  # keep tooltip compact
-    else:
-        tooltip_text = "Awards breakdown\\nNo awards in current filters."
+# -----------------------
+# KPIs (boxed style with ? hover)
+# -----------------------
+def display_team_level_kpis(df_allhands: pd.DataFrame, df_kudos: pd.DataFrame):
+    distinct_all = int(clean_teamname_df(df_allhands)['Team name'].nunique()) if df_allhands is not None and not df_allhands.empty else 0
+    distinct_kudos = int(clean_teamname_df(df_kudos)['Team name'].nunique()) if df_kudos is not None and not df_kudos.empty else 0
 
-    # Layout: put 5 tiles; the 3rd (Awards Count) is hover-enabled
+    def avg_teams_per_month(df: pd.DataFrame) -> float:
+        if df is None or df.empty or 'Date' not in df.columns:
+            return 0.0
+        monthly = clean_teamname_df(df).groupby(df['Date'].dt.to_period('M'))['Team name'].nunique()
+        if monthly.empty:
+            return 0.0
+        return float(monthly.mean())
+
+    avg_month_all = avg_teams_per_month(df_allhands)
+    avg_month_kudos = avg_teams_per_month(df_kudos)
+
+    team_awards_all = 0
+    team_awards_kudos = 0
+    if df_allhands is not None and not df_allhands.empty and 'New_Award_title' in df_allhands.columns:
+        team_awards_all = int((df_allhands['New_Award_title'] == 'Team Award').sum())
+    if df_kudos is not None and not df_kudos.empty and 'New_Award_title' in df_kudos.columns:
+        team_awards_kudos = int((df_kudos['New_Award_title'] == 'Team Award').sum())
+    approx_team_coupons = team_awards_all + team_awards_kudos
+
+    st.subheader("Team-Level KPIs: All Hands vs Kudos Corner")
     c1, c2, c3, c4, c5 = st.columns(5)
+
     with c1:
-        st.metric("Total Allocation", _fmt_currency(total_amount))
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <h4>
+                  <span class="kpi-label">
+                    Teams Recognised (All Hands)
+                    <span class="kpi-help" title="Number of distinct teams that received at least one award in the All Hands (Town Hall) system for the selected period.">?</span>
+                  </span>
+                </h4>
+                <h2>{distinct_all}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     with c2:
-        st.metric("Avg per Award", _fmt_currency(avg_amount))
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <h4>
+                  <span class="kpi-label">
+                    Teams Recognised (Kudos Corner)
+                    <span class="kpi-help" title="Number of distinct teams that received at least one award via Kudos Corner during the selected period.">?</span>
+                  </span>
+                </h4>
+                <h2>{distinct_kudos}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     with c3:
-        _metric_with_hover("Awards Count", f"{total_awards}", tooltip_text)
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <h4>
+                  <span class="kpi-label">
+                    Avg Teams/Month (All Hands)
+                    <span class="kpi-help" title="Average number of unique teams recognised per month in the All Hands system (based on the selected years and filters).">?</span>
+                  </span>
+                </h4>
+                <h2>{avg_month_all:.1f}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     with c4:
-        st.metric("Active Teams", f"{team_counts}")
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <h4>
+                  <span class="kpi-label">
+                    Avg Teams/Month (Kudos Corner)
+                    <span class="kpi-help" title="Average number of unique teams recognised per month via Kudos Corner in the selected period.">?</span>
+                  </span>
+                </h4>
+                <h2>{avg_month_kudos:.1f}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     with c5:
-        st.metric("Top Team by Allocation", top_team, delta=f"{share:.1f}% share")
-
-# -----------------------
-# Allocation chart
-# -----------------------
-def plot_team_allocation(total_df, stack_by_award=False, top_n=10, title_suffix=""):
-    df = total_df.dropna(subset=['Team name']).copy()
-    if df.empty:
-        st.info("No allocation data for current filters.")
-        return
-
-    if 'Amount' not in df.columns:
-        st.info("Amount column missing after parsing; showing nothing.")
-        return
-
-    if stack_by_award:
-        agg = (
-            df.groupby(['Team name', 'Award_Type'], as_index=False)['Amount']
-              .sum()
-              .sort_values('Amount', ascending=False)
-        )
-        top_teams = (
-            agg.groupby('Team name', as_index=False)['Amount'].sum()
-               .sort_values('Amount', ascending=False)['Team name']
-               .head(top_n)
-               .tolist()
-        )
-        agg = agg[agg['Team name'].isin(top_teams)]
-        fig = px.bar(
-            agg, x='Team name', y='Amount', color='Award_Type',
-            title=f"Top {top_n} Teams by Total Allocation {title_suffix}",
-            barmode='stack', text_auto='.2s'
-        )
-    else:
-        agg = (
-            df.groupby('Team name', as_index=False)['Amount']
-              .sum()
-              .sort_values('Amount', ascending=False)
-              .head(top_n)
-        )
-        fig = px.bar(
-            agg, x='Team name', y='Amount',
-            title=f"Top {top_n} Teams by Total Allocation {title_suffix}",
-            text_auto='.2s'
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <h4>
+                  <span class="kpi-label">
+                    Approx Team Award Coupons
+                    <span class="kpi-help" title="Total count of Team Award instances across All Hands and Kudos Corner. This is a rough proxy for how many team coupons were distributed.">?</span>
+                  </span>
+                </h4>
+                <h2>{approx_team_coupons}</h2>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-    fig.update_layout(
-        xaxis_title='Team',
-        yaxis_title='Total Allocation (₹)',
-        template='plotly_white'
+    st.caption(
+        "Approx Team Award Coupons = count of Team Award instances (All Hands + Kudos Corner). "
+        "Kudos Corner currently has only a few months of data, so KPIs are descriptive."
     )
-    st.plotly_chart(fig, use_container_width=True)
-
-    if not stack_by_award:
-        st.dataframe(
-            agg.rename(columns={'Amount': 'Total Allocation (₹)'}),
-            use_container_width=True
-        )
 
 # -----------------------
-# UI
+# Team frequency table
+# -----------------------
+def build_team_frequency_table(
+    df: pd.DataFrame,
+    selected_years,
+    team_mode,
+    selected_team,
+    top_team_count,
+    freq_award_filter: str,
+    employee_team_map=None
+):
+    df_freq = df[df['year'].isin(selected_years)].copy()
+
+    if employee_team_map is not None and not employee_team_map.empty:
+        awesome_award_rows = df_freq[df_freq['New_Award_title'] == 'Awesome Award'].copy()
+        mapped = awesome_award_rows.merge(
+            employee_team_map, on='Employee Name', how='left', suffixes=('', '_mapped')
+        )
+        mapped['Team name'] = mapped['Team name_mapped'].fillna(mapped['Team name'])
+        mapped = mapped.drop(columns=['Team name_mapped'])
+        non_awesome = df_freq[df_freq['New_Award_title'] != 'Awesome Award'].copy()
+        df_freq = pd.concat([non_awesome, mapped], ignore_index=True)
+
+    if freq_award_filter == "Team Award only":
+        df_freq = df_freq[df_freq['New_Award_title'] == 'Team Award']
+    elif freq_award_filter == "Awesome Award only":
+        df_freq = df_freq[df_freq['New_Award_title'] == 'Awesome Award']
+    else:
+        df_freq = df_freq[df_freq['New_Award_title'].isin(['Team Award', 'Awesome Award'])]
+
+    df_freq = clean_teamname_df(df_freq, column='Team name')
+
+    if df_freq.empty:
+        return pd.DataFrame(columns=[
+            "Team",
+            "Team size (No. of people recognised)",
+            "No. of times team got awarded",
+            "Total Team Awards",
+            "Total Awesome Awards",
+        ])
+
+    if team_mode == "Single Team":
+        if selected_team and selected_team != "All Teams":
+            df_freq = df_freq[df_freq['Team name'] == selected_team]
+    elif team_mode == "Most Couponed Teams":
+        counts = df_freq['Team name'].value_counts()
+        top_teams = counts.head(top_team_count).index.tolist()
+        df_freq = df_freq[df_freq['Team name'].isin(top_teams)]
+
+    if df_freq.empty:
+        return pd.DataFrame(columns=[
+            "Team",
+            "Team size (No. of people recognised)",
+            "No. of times team got awarded",
+            "Total Team Awards",
+            "Total Awesome Awards",
+        ])
+
+    grouped = df_freq.groupby('Team name').agg(
+        team_size=('Employee Name', 'nunique'),
+        times_awarded=('New_Award_title', 'nunique'),
+        total_team_awards=('New_Award_title', lambda s: (s == 'Team Award').sum()),
+        total_awesome_awards=('New_Award_title', lambda s: (s == 'Awesome Award').sum()),
+    ).reset_index()
+
+    grouped['total_awards_internal'] = grouped['total_team_awards'] + grouped['total_awesome_awards']
+    grouped = grouped.sort_values('total_awards_internal', ascending=False)
+
+    grouped = grouped.rename(columns={
+        'Team name': 'Team',
+        'team_size': 'Team size (No. of people recognised)',
+        'times_awarded': 'No. of times team got awarded',
+        'total_team_awards': 'Total Team Awards',
+        'total_awesome_awards': 'Total Awesome Awards',
+    })
+
+    grouped = grouped.drop(columns=['total_awards_internal'])
+
+    return grouped
+
+# -----------------------
+# Main UI
 # -----------------------
 def show_recognition_team_tab():
-    df = load_and_process_data()
-    st.title("Team & Awesome Awards Trends")
+    # inject glass + kpi CSS
+    st.markdown(glass_css, unsafe_allow_html=True)
 
+    df = load_and_process_data()
+
+    st.title("Team-Level Trends")
+    st.caption(
+        "These charts show *team-level trends* combining **Team Awards** and **Awesome Awards**. "
+        "**All Hands** represents the legacy ceremony, and **Kudos Corner** represents the new system."
+    )
+
+    employee_team_map = (
+        df[df['Team name'].str.contains('greenmath|edgecore', case=False, na=False)]
+        [['Employee Name', 'Team name']]
+        .dropna()
+        .drop_duplicates()
+    )
+
+    # -------- Filters --------
     with st.container():
-        col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 2])
+        col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 2])
+
         with col1:
             period_options = ["Monthly", "Quarterly", "Yearly"]
             time_period = st.selectbox("Select Period", period_options, index=0)
+
         with col2:
             years = sorted(df['year'].dropna().unique())
-            default_years = years[-2:] if len(years) >= 2 else years
-            selected_years = st.multiselect("Year(s)", years, default=default_years)
-        with col3:
-            award_types = st.multiselect(
-                "Select Award Type(s)",
-                ["Team Award", "Awesome Award"],
-                default=["Team Award", "Awesome Award"]
+            year_options = ["All"] + list(years)
+            selected_years_raw = st.multiselect(
+                "Select Year(s)",
+                options=year_options,
+                default=["All"],
             )
+            if "All" in selected_years_raw or not selected_years_raw:
+                selected_years = years
+            else:
+                selected_years = [
+                    y for y in selected_years_raw if isinstance(y, (int, float))
+                ]
+
+        with col3:
+            team_mode = st.selectbox(
+                "Display Teams by",
+                ["All Teams", "Most Couponed Teams", "Single Team"],
+                index=1
+            )
+
         with col4:
-            team_mode = st.selectbox("Display Teams by", ["All Teams", "Top Teams", "Single Team"], index=1)
+            teams_filtered_by_year = sorted(
+                clean_teamname_df(df[df['year'].isin(selected_years)])['Team name'].unique()
+            )
+            top_team_count = (
+                st.slider(
+                    "No. of Most Couponed Teams",
+                    min_value=5,
+                    max_value=min(20, len(teams_filtered_by_year)) if teams_filtered_by_year else 5,
+                    value=min(10, len(teams_filtered_by_year)) if teams_filtered_by_year else 5
+                ) if team_mode == "Most Couponed Teams" else None
+            )
+
         with col5:
-            teams = sorted(df['Team name'].dropna().unique())
-            top_team_count = st.slider(
-                "No. Top Teams",
-                min_value=5,
-                max_value=min(20, len(teams)) if len(teams) else 5,
-                value=min(10, len(teams)) if len(teams) else 5
-            ) if team_mode == "Top Teams" else None
-        with col6:
-            kudos_filter = st.checkbox("Kudos Corner", value=False)
+            # Default is All Awards
+            freq_award_filter = st.selectbox(
+                "Awards for Team Frequency",
+                ["All Awards (Team + Awesome)", "Team Award only", "Awesome Award only"],
+                index=0
+            )
 
-        selected_team = st.selectbox("Select Team", ["All Teams"] + teams) if team_mode == "Single Team" else None
+        selected_team = (
+            st.selectbox("Select Team", ["All Teams"] + teams_filtered_by_year)
+            if team_mode == "Single Team"
+            else None
+        )
 
-    trend_df, filtered_df = build_award_trend(
-        df, award_types, selected_years, time_period,
-        team_mode, selected_team, top_team_count,
-        kudos_corner=kudos_filter
+    # -------- Split All Hands vs Kudos --------
+    nom_col = next((c for c in ['Nominated', 'Nominated In', 'NominatedIn'] if c in df.columns), None)
+    if nom_col:
+        nom_series = df[nom_col].astype(str)
+        mask_kudos = nom_series.str.contains("kudos", case=False, na=False)
+        mask_all = nom_series.str.contains("all", case=False, na=False) & ~mask_kudos
+        if not mask_all.any():
+            mask_all = ~mask_kudos
+        df_allhands = df[mask_all].copy()
+        df_kudos = df[mask_kudos].copy()
+    else:
+        df_allhands = df.copy()
+        df_kudos = df[df.apply(lambda row: any("kudos" in str(v).lower() for v in row), axis=1)].copy()
+
+    # -------- Build trends --------
+    trend_all, combined_all = build_award_trend(
+        df_allhands,
+        selected_years,
+        time_period,
+        team_mode,
+        selected_team,
+        top_team_count,
+        employee_team_map=employee_team_map,
+    )
+    trend_kudos, combined_kudos = build_award_trend(
+        df_kudos,
+        selected_years,
+        time_period,
+        team_mode,
+        selected_team,
+        top_team_count,
+        employee_team_map=employee_team_map,
     )
 
-    if trend_df is None or trend_df.empty:
+    if (trend_all is None or trend_all.empty) and (trend_kudos is None or trend_kudos.empty):
         st.warning("No data for selected filters.")
         return
 
-    # ---- KPIs (Awards Count hover-enabled) ----
-    display_budget_kpis(filtered_df)
-
-    # Trend line
-    fig = px.line(
-        trend_df, x='Period', y='Award_Count',
-        color='Team name', symbol='Award_Type',
-        markers=True, title="Award Trends Over Time",
-        line_dash='Award_Type',
-        color_discrete_map={"Greenmath": "#bcbd22", "Edgecore": "#8c564b"}
+    # -------- KPIs --------
+    all_df_for_kpi = filter_by_award_type(
+        combined_all if combined_all is not None else pd.DataFrame(columns=df.columns),
+        freq_award_filter
     )
-    if time_period == "Monthly":
-        fig.update_xaxes(dtick="M1", tickformat="%b %Y", tickangle=45, tickvals=trend_df['Period'].drop_duplicates())
-    elif time_period == "Quarterly":
-        fig.update_xaxes(dtick="Q1", tickformat="Q%q %Y", tickangle=45, tickvals=trend_df['Period'].drop_duplicates())
+    kudos_df_for_kpi = filter_by_award_type(
+        combined_kudos if combined_kudos is not None else pd.DataFrame(columns=df.columns),
+        freq_award_filter
+    )
+    display_team_level_kpis(all_df_for_kpi, kudos_df_for_kpi)
+
+    # -------- Team Frequency Section --------
+    st.subheader("Team Recognition Frequency (Selected Period)")
+
+    freq_df = build_team_frequency_table(
+        df,
+        selected_years,
+        team_mode,
+        selected_team,
+        top_team_count if top_team_count is not None else 10,
+        freq_award_filter,
+        employee_team_map=employee_team_map
+    )
+
+    if freq_df.empty:
+        st.info("No team recognition data for the selected filters and award type.")
     else:
-        fig.update_xaxes(dtick="Y1", tickformat="%Y", tickangle=45, tickvals=trend_df['Period'].drop_duplicates())
-    fig.update_layout(xaxis_title='Time Period', yaxis_title='Number of Awards', hovermode='x unified', template='plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
+        freq_chart_df = freq_df.copy()
+        freq_chart_df["Total Awards (Team+Awesome)"] = (
+            freq_chart_df["Total Team Awards"] + freq_chart_df["Total Awesome Awards"]
+        )
 
-    # Allocation
-    st.subheader("Top Teams by Total Allocation")
-    colA, colB = st.columns([2, 1])
-    with colA:
-        stack_view = st.checkbox("Stack by Award Type", value=False)
-    with colB:
-        top_n = st.slider("Show Top N Teams", min_value=5, max_value=20, value=10, step=1)
+        fig_freq = px.bar(
+            freq_chart_df.sort_values("Total Awards (Team+Awesome)", ascending=True),
+            x="Total Awards (Team+Awesome)",
+            y="Team",
+            orientation="h",
+            text="Total Awards (Team+Awesome)",
+            title="Total Awards (Team + Awesome) by Team"
+        )
+        fig_freq.update_layout(
+            xaxis_title="Total Awards (Team + Awesome)",
+            yaxis_title="Team",
+            template="plotly_white"
+        )
+        st.plotly_chart(fig_freq, use_container_width=True)
 
-    suffix = ""
-    if selected_years:
-        yr_label = ", ".join([str(int(y)) for y in selected_years if pd.notna(y)])
-        suffix = f"({yr_label})"
+        st.markdown("""
+- <span style='background-color:#ffb3b3'>**Red/Pink**</span>: Team received at least one Awesome Award ("Kudos Corner")
+- <span style='background-color:#b3cfff'>**Blue**</span>: Team received only Team Awards
+        """, unsafe_allow_html=True)
 
-    plot_team_allocation(filtered_df, stack_by_award=stack_view, top_n=top_n, title_suffix=f" {suffix}")
+        # darker highlight colors
+        def highlight_award_type(row):
+            awesome = row.get('Total Awesome Awards', 0)
+            team = row.get('Total Team Awards', 0)
+            if awesome > 0:
+                return ['background-color: #ffb3b3; color: #111827'] * len(row)
+            elif team > 0:
+                return ['background-color: #b3cfff; color: #111827'] * len(row)
+            else:
+                return [''] * len(row)
+
+        st.dataframe(
+            freq_df.style.apply(highlight_award_type, axis=1),
+            use_container_width=True
+        )
+
+    # -------- Line charts (after table) --------
+    if trend_all is not None and not trend_all.empty:
+        st.subheader("All Hands – Team & Awesome Awards")
+        fig_all = px.line(
+            trend_all, x='Period', y='Award_Count',
+            color='Team name', symbol='Award_Type',
+            markers=True,
+            title="All Hands Team & Awesome Awards – Team-Level Trends Over Time",
+            line_dash='Award_Type',
+            color_discrete_map={"Greenmath": "#bcbd22", "Edgecore": "#8c564b"}
+        )
+        if time_period == "Monthly":
+            fig_all.update_xaxes(
+                dtick="M1",
+                tickformat="%b %Y",
+                tickangle=45,
+                tickvals=trend_all['Period'].drop_duplicates()
+            )
+        elif time_period == "Quarterly":
+            fig_all.update_xaxes(
+                dtick="Q1",
+                tickformat="Q%q %Y",
+                tickangle=45,
+                tickvals=trend_all['Period'].drop_duplicates()
+            )
+        else:
+            fig_all.update_xaxes(
+                dtick="Y1",
+                tickformat="%Y",
+                tickangle=45,
+                tickvals=trend_all['Period'].drop_duplicates()
+            )
+        fig_all.update_layout(
+            xaxis_title='Time Period',
+            yaxis_title='Number of Awards',
+            hovermode='x unified',
+            template='plotly_white'
+        )
+        st.plotly_chart(fig_all, use_container_width=True)
+    else:
+        st.info("No All Hands data for selected filters.")
+
+    if trend_kudos is not None and not trend_kudos.empty:
+        st.subheader("Kudos Corner – Team & Awesome Awards")
+        fig_kudos = px.line(
+            trend_kudos, x='Period', y='Award_Count',
+            color='Team name', symbol='Award_Type',
+            markers=True,
+            title="Kudos Corner Team & Awesome Awards – Team-Level Trends Over Time",
+            line_dash='Award_Type',
+            color_discrete_map={"Greenmath": "#bcbd22", "Edgecore": "#8c564b"}
+        )
+        if time_period == "Monthly":
+            fig_kudos.update_xaxes(
+                dtick="M1",
+                tickformat="%b %Y",
+                tickangle=45,
+                tickvals=trend_kudos['Period'].drop_duplicates()
+            )
+        elif time_period == "Quarterly":
+            fig_kudos.update_xaxes(
+                dtick="Q1",
+                tickformat="Q%q %Y",
+                tickangle=45,
+                tickvals=trend_kudos['Period'].drop_duplicates()
+            )
+        else:
+            fig_kudos.update_xaxes(
+                dtick="Y1",
+                tickformat="%Y",
+                tickangle=45,
+                tickvals=trend_kudos['Period'].drop_duplicates()
+            )
+        fig_kudos.update_layout(
+            xaxis_title='Time Period',
+            yaxis_title='Number of Awards',
+            hovermode='x unified',
+            template='plotly_white'
+        )
+        st.plotly_chart(fig_kudos, use_container_width=True)
+    else:
+        st.info("No Kudos Corner data for selected filters.")
 
 # -----------------------
 # Entrypoint
