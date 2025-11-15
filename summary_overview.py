@@ -1,5 +1,6 @@
 import os
 import re
+import html
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -72,9 +73,12 @@ h1, h2, h3, h4 {
     justify-content: center;
     gap: 4px;
 }
+
+/* Custom tooltip bubble on hover */
 .kpi-help {
+    position: relative;
     font-size: 0.75rem;
-    color: #9ca3af;
+    color: #6b7280;
     border-radius: 999px;
     border: 1px solid #d4d4d8;
     width: 16px;
@@ -84,6 +88,49 @@ h1, h2, h3, h4 {
     justify-content: center;
     cursor: help;
     background-color: #f9fafb;
+}
+
+/* Tooltip bubble */
+.kpi-help::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 50%;
+    bottom: 125%;
+    transform: translateX(-50%);
+    background: #111827;
+    color: #f9fafb;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    white-space: normal;
+    min-width: 180px;
+    max-width: 260px;
+    text-align: left;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease-out;
+    z-index: 9999;
+}
+
+/* Small arrow under tooltip */
+.kpi-help::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 115%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: #111827 transparent transparent transparent;
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
+}
+
+/* Show tooltip on hover */
+.kpi-help:hover::after,
+.kpi-help:hover::before {
+    opacity: 1;
 }
 
 /* Glass-style wrapper for all Plotly charts */
@@ -181,14 +228,10 @@ def current_sentiment_score(df):
 # ================= FIXED: REAL RECOGNITION REACH =================
 def recognition_reach_rate(df):
     col_aw = COLS["which_awards"]
-
-    # Count only those who ACTUALLY received an award
     has_awards = df[col_aw].apply(lambda x: len(parse_awards(x)) > 0)
-
     total = len(df)
     if total == 0:
         return np.nan
-
     return float(has_awards.sum() / total * 100)
 
 
@@ -226,16 +269,32 @@ def show_wordcloud(texts, title, colormap="viridis", phrase_cloud=False):
     st.pyplot(fig)
 
 
-# ================= KPI (NO DECIMALS, WITH ? ICON) =================
-def safe_metric(v, label, help_text):
-    display = "–" if np.isnan(v) else str(int(round(v)))
+# ================= KPI (WITH ? ICON & OPTIONAL SUFFIX) =================
+def safe_metric(v, label, help_text, suffix=""):
+    tip = html.escape(str(help_text), quote=True)
+
+    # Gracefully handle NaN / None / non-numeric
+    if v is None:
+        display = "–"
+    else:
+        try:
+            # if numeric, round and apply suffix
+            val = float(v)
+            if np.isnan(val):
+                display = "–"
+            else:
+                display = f"{int(round(val))}{suffix}"
+        except Exception:
+            # if already a nice string, just show it
+            display = f"{v}{suffix}"
+
     st.markdown(
         f"""
         <div class="metric-card">
           <h4>
             <span class="kpi-label">
               {label}
-              <span class="kpi-help" title="{help_text}">?</span>
+              <span class="kpi-help" data-tip="{tip}">?</span>
             </span>
           </h4>
           <h2>{display}</h2>
@@ -253,8 +312,6 @@ def show_rr_dashboard():
     )
 
     df = load_survey_data()
-
-    # USE ALL PARTICIPANTS (FIX)
     survey_participants = df
 
     # KPI VALUES
@@ -284,14 +341,16 @@ def show_rr_dashboard():
         safe_metric(
             reach,
             "How Many People Got Recognized",
-            "Percentage of all survey participants who actually received at least one award."
+            "Percentage of all survey participants who actually received at least one award.",
+            suffix="%"
         )
 
     with k[3]:
         safe_metric(
             lift,
             "Improvement From Earlier System",
-            "Relative % change in happiness: (Current − Earlier) ÷ Earlier × 100."
+            "Relative % change in happiness: (Current − Earlier) ÷ Earlier × 100.",
+            suffix="%"
         )
 
     st.divider()
@@ -347,18 +406,14 @@ def show_rr_dashboard():
 
     st.divider()
 
-    # =====================================================
-    # WORD MAPS — DIFFERENT COLORS + REMOVE NAN/NO/NONE
-    # =====================================================
+    # WORD MAPS
     st.markdown("<p class='section-title'>🧠 What people liked — Earlier vs Current</p>", unsafe_allow_html=True)
 
-    # Earlier likes
     earlier_likes = [
         t.strip() for t in survey_participants[COLS["earlier_like"]].astype(str).tolist()
         if t.strip().lower() not in {"na", "none", "no", "-", "nil", "nan", ""}
     ]
 
-    # Current likes
     current_likes = [
         t.strip() for t in survey_participants[COLS["like_current"]].astype(str).tolist()
         if t.strip().lower() not in {"na", "none", "no", "-", "nil", "nan", ""}
@@ -372,9 +427,7 @@ def show_rr_dashboard():
 
     st.divider()
 
-    # =====================================================
-    # IMPROVEMENT SUGGESTIONS — REMOVE USELESS TEXT
-    # =====================================================
+    # IMPROVEMENTS
     st.markdown("<p class='section-title'>🔧 Key improvement suggestions</p>", unsafe_allow_html=True)
 
     raw_improvements = survey_participants[COLS["improve_current"]].astype(str).tolist()
