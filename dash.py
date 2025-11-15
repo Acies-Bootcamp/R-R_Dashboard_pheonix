@@ -51,7 +51,7 @@ elif section == "Award Analysis":
     show_award_analysis()
 
 elif section == "Coupon Estimation":
-    st.caption("💡 Coupon Estimation logic and parameters coming soon.")
+    st.title("Coupon Estimation")
     show_coupon_estimation()
 
 elif section == "Findings/Insights":

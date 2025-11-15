@@ -2,6 +2,10 @@ import os
 import re
 import numpy as np
 import pandas as pd
+import os
+import re
+import numpy as np
+import pandas as pd
 import streamlit as st
 import plotly.express as px
 from nltk.sentiment import SentimentIntensityAnalyzer
@@ -137,9 +141,87 @@ def load_survey_data():
         encoding="utf-8"
     )
     df.columns = df.columns.str.strip().str.replace("\n", " ").str.replace("\r", "")
+    df = pd.read_csv(
+        f"https://docs.google.com/spreadsheets/d/{sheet_key}/export?format=csv",
+        on_bad_lines="skip",
+        encoding="utf-8"
+    )
+    df.columns = df.columns.str.strip().str.replace("\n", " ").str.replace("\r", "")
     return df
 
 
+def clean_text(x):
+    return "" if pd.isna(x) else str(x).strip()
+
+
+def parse_awards(cell):
+    text = clean_text(cell)
+    if not text:
+        return []
+    parts = re.split(r"[,/|;]", text)
+    return [
+        p.strip()
+        for p in parts
+        if p.strip().lower() not in {"na", "none", "no award", "no award yet", "-", ""}
+    ]
+
+
+def earlier_rating_score(df):
+    s = pd.to_numeric(df[COLS["earlier_rating"]], errors="coerce")
+    return float((s.mean() / 3) * 100) if not s.dropna().empty else np.nan
+
+
+def score_sentiment_texts(texts):
+    texts = [clean_text(t) for t in texts if clean_text(t)]
+    if not texts:
+        return np.nan
+    sia = SentimentIntensityAnalyzer()
+    vals = [(sia.polarity_scores(t)["compound"] + 1) / 2 * 100 for t in texts]
+    return float(np.mean(vals))
+
+
+def current_sentiment_score(df):
+    fields = ["like_current", "improve_current", "comments_any"]
+    texts = []
+    for key in fields:
+        texts.extend(df[COLS[key]].astype(str).tolist())
+    return score_sentiment_texts(texts)
+
+
+# ================= FIXED: REAL RECOGNITION REACH =================
+def recognition_reach_rate(df):
+    col_aw = COLS["which_awards"]
+
+    # Count only those who ACTUALLY received an award
+    has_awards = df[col_aw].apply(lambda x: len(parse_awards(x)) > 0)
+
+    total = len(df)
+    if total == 0:
+        return np.nan
+
+    return float(has_awards.sum() / total * 100)
+
+
+# ================= WORDCLOUD =================
+def show_wordcloud(texts, title, colormap="viridis", phrase_cloud=False):
+    if not _WORDCLOUD_OK:
+        st.info("WordCloud not available.")
+        return
+
+    texts = [clean_text(t) for t in texts if t]
+    if not texts:
+        st.info(f"No data for {title}")
+        return
+
+    if phrase_cloud:
+        trimmed = [" ".join(t.split()[:10]) for t in texts]
+        freq = Counter(trimmed)
+        wc = WordCloud(
+            width=1100, height=400,
+            background_color="white",
+            colormap=colormap
+        ).generate_from_frequencies(freq)
+        fig, ax = plt.subplots(figsize=(14, 6))
 def clean_text(x):
     return "" if pd.isna(x) else str(x).strip()
 
