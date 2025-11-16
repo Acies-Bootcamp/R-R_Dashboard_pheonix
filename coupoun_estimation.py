@@ -300,10 +300,11 @@ def show_coupon_estimation():
         c1, c2 = st.columns(2)
         c3, c4 = st.columns(2)
 
-        c1.image("holt winters.png", caption="Holt-Winters Forecast", use_column_width=True)
-        c2.image("arima.png", caption="ARIMA Model", use_column_width=True)
-        c3.image("sarima.png", caption="SARIMA Model", use_column_width=True)
-        c4.image("mv.png", caption="Moving Average Model", use_column_width=True)
+        c1.image("holt winters.png", caption="Holt-Winters Forecast", use_container_width=True)
+        c2.image("arima.png", caption="ARIMA Model", use_container_width=True)
+        c3.image("sarima.png", caption="SARIMA Model", use_container_width=True)
+        c4.image("mv.png", caption="Moving Average Model", use_container_width=True)
+
 
 
 # Run App

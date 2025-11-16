@@ -72,6 +72,7 @@ h1, h2, h3, h4 {
     align-items: center;
     justify-content: center;
     gap: 4px;
+    white-space: nowrap;  /* keep label + ? on same line */
 }
 
 /* Custom tooltip bubble on hover */
@@ -153,7 +154,6 @@ h1, h2, h3, h4 {
 }
 </style>
 """
-st.markdown(glass_css, unsafe_allow_html=True)
 
 
 # ================= COLUMN KEYS =================
@@ -270,22 +270,19 @@ def show_wordcloud(texts, title, colormap="viridis", phrase_cloud=False):
 
 
 # ================= KPI (WITH ? ICON & OPTIONAL SUFFIX) =================
-def safe_metric(v, label, help_text, suffix=""):
+def safe_metric(v, label, help_text, suffix: str = ""):
     tip = html.escape(str(help_text), quote=True)
 
-    # Gracefully handle NaN / None / non-numeric
     if v is None:
         display = "–"
     else:
         try:
-            # if numeric, round and apply suffix
             val = float(v)
             if np.isnan(val):
                 display = "–"
             else:
                 display = f"{int(round(val))}{suffix}"
         except Exception:
-            # if already a nice string, just show it
             display = f"{v}{suffix}"
 
     st.markdown(
@@ -306,6 +303,9 @@ def safe_metric(v, label, help_text, suffix=""):
 
 # ================= MAIN DASHBOARD =================
 def show_rr_dashboard():
+    # inject CSS *inside* the page so it always applies
+    st.markdown(glass_css, unsafe_allow_html=True)
+
     st.caption(
         "Comparing the earlier Town Hall-based R&R with the current Kudos Bot system "
         "using participant feedback, sentiment and recognition reach."
