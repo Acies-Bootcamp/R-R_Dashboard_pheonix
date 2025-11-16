@@ -137,11 +137,7 @@ def show_award_analysis():
     </style>
     """
     st.markdown(base_css, unsafe_allow_html=True)
-    
-    st.markdown(
-        "<h1 style='text-align:center;'>Award Analysis Dashboard 🏆</h1>",
-        unsafe_allow_html=True,
-    )
+
     df = load_data()
     
     st.markdown("<p class='section-title'>Filter Options</p>", unsafe_allow_html=True)
