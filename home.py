@@ -1,71 +1,131 @@
 import streamlit as st
 
-def show_home_page():
-    st.title("🏆 Rewards & Recognition Dashboard")
-    st.caption("Developed as part of the Capstone Project • November 2025")
+# ---------------------------------------------------------
+# 🧭 NAVIGATION BAR (Gapless + Clean Header Fix)
+# ---------------------------------------------------------
+def show_navbar():
+    current_page = st.session_state.get("current_page", "Home")
 
-    # --- Introduction ---
+    st.markdown("""
+    <style>
+
+    /* ---------------------------------------------------
+       GLOBAL FIX: Remove ALL default top padding
+    --------------------------------------------------- */
+
+    header, [data-testid="stHeader"] {
+        margin-top: -3rem !important;
+        padding-top: 0rem !important;
+    }
+
+    .main > div:first-child {
+        padding-top: 0rem !important;
+        margin-top: 0rem !important;
+    }
+
+    .block-container {
+        padding-top: 0rem !important;
+        margin-top: 0rem !important;
+    }
+
+    /* ---------------------------------------------------
+       NAVBAR STYLING
+    --------------------------------------------------- */
+    .navbar-wrapper {
+        padding: 0.8rem 0.2rem 1.0rem 0.2rem;
+        background-color: white;
+        border-bottom: 1px solid #e6e6e6;
+        margin-top: -1rem !important;
+        z-index: 999;
+        position: relative;
+    }
+
+    .stButton > button {
+        transition: all 0.2s ease-in-out;
+        border-radius: 10px !important;
+        font-weight: 500;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px);
+    }
+
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div class='navbar-wrapper'>", unsafe_allow_html=True)
+
+    nav_cols = st.columns(6)
+
+    def nav_button(col, label, key, page):
+        with col:
+            btn_type = "primary" if current_page == page else "secondary"
+            if st.button(label, key=key, use_container_width=True, type=btn_type):
+                st.session_state.current_page = page
+                st.rerun()
+
+    nav_button(nav_cols[0], "🏠 Home", "nav_home", "Home")
+    nav_button(nav_cols[1], "📊 Overview", "nav_overview", "Overview")
+    nav_button(nav_cols[2], "🏅 Recognition", "nav_recognition", "Recognition")
+    nav_button(nav_cols[3], "🏆 Award Analysis", "nav_award", "Award Analysis")
+    nav_button(nav_cols[4], "📈 Coupon Estimation", "nav_coupon", "Coupon Estimation")
+    nav_button(nav_cols[5], "🔍 Findings/Insights", "nav_findings", "Findings/Insights")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+
+# ---------------------------------------------------------
+# 🏡 HOME PAGE CONTENT
+# ---------------------------------------------------------
+def show_home_page():
+
+    # -----------------------------------
+    # PAGE CONTENT (Starts directly)
+    # -----------------------------------
     st.markdown("""
     Welcome to the **Rewards & Recognition (R&R) Dashboard** — a comprehensive platform designed to analyze and visualize how recognition flows across teams and individuals within the organization.  
-    The application helps evaluate the transition from the *Old Mentor-Based System* to the *New Peer-to-Peer Model* launched in June 2025.
+    This dashboard evaluates the transition from the *Old Mentor-Based System* to the *New Peer-to-Peer Model* launched in June 2025.
     """)
 
     st.markdown("---")
     st.markdown("### 🎯 Purpose")
     st.markdown("""
-    The R&R Dashboard aims to:
     - Understand the **effectiveness and fairness** of the new recognition process.  
-    - Identify **team and individual performance trends** across departments.  
-    - Assess how **award titles** are distributed and utilized under the new system.  
-    - **Forecast recognition requirements** for future quarters based on past data trends.  
+    - Identify **team and individual performance trends**.  
+    - Analyze **award distribution** across departments.  
+    - Forecast future **coupon requirements**.  
     """)
 
     st.markdown("---")
-    st.markdown("### ⚙️ Key Modules in This Dashboard")
-    c1, c2 = st.columns(2)
-    with c1:
+    st.markdown("### ⚙️ Core Modules")
+
+    col1, col2 = st.columns(2)
+    with col1:
         st.markdown("""
         **🏅 Recognition Module**  
-        - Explore awards at both **Team** and **Individual** levels.  
-        - Track engagement, participation, and nomination sources.  
+        - Team & individual level breakdown  
+        - Participation & nomination trends  
         """)
-    with c2:
+    with col2:
         st.markdown("""
         **📊 Award Analysis Module**  
-        - Examine frequency and distribution of different award titles.  
-        - Identify patterns and category dominance across teams.  
+        - Title frequency  
+        - Category distribution  
         """)
 
-    c3, c4 = st.columns(2)
-    with c3:
+    col3, col4 = st.columns(2)
+    with col3:
         st.markdown("""
         **📈 Coupon Forecasting Module**  
-        - Predict the **number of coupons** required for the upcoming quarter.  
-        - Uses time-series models such as SARIMA or Moving Average for trend-based prediction.  
+        - SARIMA + Moving Average models  
         """)
-    with c4:
+    with col4:
         st.markdown("""
-        **🔍 Findings & Insights**  
-        - Summarizes the conclusions drawn from the analysis.  
-        - Highlights recommendations for improving engagement and fairness.  
+        **🔍 Insights Module**  
+        - Recommendations & fairness analysis  
         """)
-
-    st.markdown("---")
-    st.markdown("### 🧩 How It Works")
-    st.markdown("""
-    1. **Data Integration:** The dashboard reads cleaned R&R data (month, nominated to, given to, title, system version).  
-    2. **Visualization:** Interactive charts reveal recognition trends by team, individual, and category.  
-    3. **Comparison:** The system contrasts Old vs New models to identify shifts in engagement and fairness.  
-    4. **Forecasting:** Predictive models estimate the number of coupons needed for future quarters.  
-    """)
-
-    st.markdown("---")
-    st.markdown("### 🌟 Expected Outcomes")
-    st.markdown("""
-    - Improved understanding of recognition fairness and visibility.  
-    - Data-driven insights to **enhance employee motivation and satisfaction.**  
-    - Clear quarterly planning for **award distribution and budgeting.**  
-    """)
 
     st.markdown("---")
     st.caption("Designed for the Capstone R&R Analysis — Bringing Clarity to Recognition Trends.")
+
