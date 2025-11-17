@@ -17,18 +17,21 @@ def safe_numeric(s):
     return pd.to_numeric(s, errors="coerce")
 
 def create_date(df):
+    # Handle Month as full name, short name or number
     df["Month"] = df["Month"].astype(str).str.strip()
     m1 = pd.to_datetime(df["Month"], format="%B", errors="coerce")
     m2 = pd.to_datetime(df["Month"], format="%b", errors="coerce")
     m3 = pd.to_numeric(df["Month"], errors="coerce")
+
     df["Month_num"] = m1.dt.month.fillna(m2.dt.month).fillna(m3)
     df = df[df["Month_num"].notna()].copy()
     df["Month_num"] = df["Month_num"].astype(int)
-    df["Date"] = pd.to_datetime(
-        df["year"].astype(str) + "-" +
-        df["Month_num"].astype(str) + "-01",
-        errors="coerce"
-    )
+
+    # Create a full date column
+    df["Date"] = pd.to_datetime(df["year"].astype(str) + "-" +
+                                df["Month_num"].astype(str) + "-01",
+                                errors="coerce")
+
     return df.dropna(subset=["Date"])
 
 # ============================================================
@@ -39,8 +42,10 @@ def fix_frequency(freqstr):
     if freqstr is None:
         return "M"
     freqstr = str(freqstr).upper()
-    if freqstr.startswith("M"): return "M"
-    if freqstr.startswith("Q"): return "Q"
+    if freqstr.startswith("M"):
+        return "M"
+    if freqstr.startswith("Q"):
+        return "Q"
     return "M"
 
 # ============================================================
@@ -54,7 +59,7 @@ def get_award_type(award_name):
     return "spot" in nm, "team" in nm, "champion" in nm
 
 # ============================================================
-# HOLT-WINTERS FORECAST
+# HOLT-WINTERS FORECAST ENGINE
 # ============================================================
 
 def _holt_winters_forecast(series, periods, seasonal_period):
@@ -62,16 +67,26 @@ def _holt_winters_forecast(series, periods, seasonal_period):
     if series is None or len(series) == 0:
         freq = "M" if seasonal_period == 12 else "Q"
         idx = pd.date_range(pd.Timestamp.today(), periods=periods + 1, freq=freq)
-        return pd.Series([0]*(periods+1), index=idx)
+        return pd.Series([0] * (periods + 1), index=idx)
 
     if len(series) < 2:
         last = series.index[-1]
         freq = fix_frequency(series.index.freqstr or ("M" if seasonal_period == 12 else "Q"))
-        idx = pd.date_range(last, periods=periods+1, freq=freq)
-        return pd.Series([series.iloc[-1]]*(periods+1), index=idx)
+        idx = pd.date_range(last, periods=periods + 1, freq=freq)
+        return pd.Series([series.iloc[-1]] * (periods + 1), index=idx)
 
     if series.index.freq is None:
         series = series.asfreq("M" if seasonal_period == 12 else "Q")
+
+    def fallback():
+        last = series.index[-1]
+        freq = fix_frequency(series.index.freqstr)
+        next_period = pd.date_range(last, periods=2, freq=freq)[1]
+        idx = pd.date_range(next_period, periods=periods, freq=freq)
+        fc = pd.Series([series.mean()] * periods, index=idx)
+        return pd.concat(
+            [pd.Series([series.iloc[-1]], index=[series.index[-1]]), fc]
+        )
 
     configs = [
         {"trend": "add", "seasonal": "add", "seasonal_periods": seasonal_period},
@@ -89,7 +104,7 @@ def _holt_winters_forecast(series, periods, seasonal_period):
                     series,
                     trend=cfg["trend"],
                     seasonal=cfg["seasonal"],
-                    seasonal_periods=cfg["seasonal_periods"]
+                    seasonal_periods=cfg["seasonal_periods"],
                 )
 
             fit = model.fit(optimized=True, remove_bias=False)
@@ -101,26 +116,26 @@ def _holt_winters_forecast(series, periods, seasonal_period):
             idx = pd.date_range(next_period, periods=periods, freq=freq)
             raw_fc.index = idx
 
-            return pd.concat([
-                pd.Series([series.iloc[-1]], index=[series.index[-1]]),
-                raw_fc
-            ])
+            return pd.concat(
+                [pd.Series([series.iloc[-1]], index=[series.index[-1]]), raw_fc]
+            )
+
         except:
             continue
 
-    return series
+    return fallback()
 
 @st.cache_data(show_spinner=False)
 def holtwinters_auto_forecast(series, periods, seasonal_period):
     return _holt_winters_forecast(series, periods, seasonal_period)
 
+
 # ============================================================
-# MAIN APP
+# MAIN APP (3 TABS)
 # ============================================================
 
 def show_coupon_estimation():
 
-    # NOW THREE TABS
     tab1, tab_events, tab2 = st.tabs([
         "Forecasting Dashboard",
         "Event & Team Size Inputs",
@@ -128,7 +143,7 @@ def show_coupon_estimation():
     ])
 
     # ============================================================
-    # TAB 2 — EVENT TABLE (OPTION B)
+    # TAB EVENTS — Editable Event Table
     # ============================================================
 
     with tab_events:
@@ -136,7 +151,7 @@ def show_coupon_estimation():
         st.header("Event & Team Size Inputs (Editable Table)")
         st.info("Add Hiring Drives, Workshops, Launches etc. — impact affects *only budgets*, not graphs.")
 
-        # Initial sample rows
+        # Initial table load
         if "event_table" not in st.session_state:
             st.session_state["event_table"] = pd.DataFrame([
                 {"Event": "Hiring Drive", "Team Size": 120,
@@ -161,8 +176,10 @@ def show_coupon_estimation():
             }
         )
 
+        # Save back to session state
         st.session_state["event_table"] = edited
 
+        # Compute impact
         event_df = edited.copy()
         event_df["Team Size"] = pd.to_numeric(event_df["Team Size"], errors="coerce").fillna(0)
         event_df["Impact %"] = pd.to_numeric(event_df["Impact %"], errors="coerce").fillna(0)
@@ -190,15 +207,20 @@ def show_coupon_estimation():
         df = pd.read_csv(
             f"https://docs.google.com/spreadsheets/d/{sheet_key}/export?format=csv"
         )
+
+        # Clean & Prepare
+        df.columns = df.columns.str.strip()
         df["Coupon Amount"] = safe_numeric(df["Coupon Amount"]).fillna(0)
         df = create_date(df)
 
         st.subheader("Filters")
 
         years = sorted(df["year"].unique())
-        default_years = years[-3:]
+        default_years = years[-3:] if len(years) >= 3 else years
 
         raw_awards = df["New_Award_title"].dropna().astype(str)
+
+        # Remove incorrect spellings + OTA awards
         blocked_keywords = ["aswome", "awesome", "asomw", "ossoc", "assoc", "occ", "ota"]
 
         clean_awards = raw_awards[
@@ -206,97 +228,90 @@ def show_coupon_estimation():
         ].unique()
 
         award_list = sorted(clean_awards.tolist())
+
         default_spot = next((a for a in award_list if "spot" in a.lower()), award_list[0])
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
 
         year_filter = col1.multiselect("Select Year(s)", years, default=default_years)
-        award_filter = col2.selectbox("Select Award Title", award_list, index=award_list.index(default_spot))
-
-        forecast_period = col3.selectbox("Forecast Period", [3, 6, 9, 12], index=1)
+        award_filter = col2.selectbox("Select Award Title", award_list,
+                                      index=award_list.index(default_spot))
 
         df_f = df[df["year"].isin(year_filter)]
         df_f = df_f[df_f["New_Award_title"] == award_filter]
 
         has_spot, has_team, has_champion = get_award_type(award_filter)
 
-        monthly = df_f.groupby(pd.Grouper(key="Date", freq="M"))["Coupon Amount"] \
-            .count().asfreq("M").fillna(0)
+        monthly = df_f.groupby(pd.Grouper(key="Date", freq="M"))["Coupon Amount"].count().asfreq("M").fillna(0)
+        quarterly = df_f.groupby(pd.Grouper(key="Date", freq="Q"))["Coupon Amount"].count().asfreq("Q").fillna(0)
 
-        quarterly = df_f.groupby(pd.Grouper(key="Date", freq="Q"))["Coupon Amount"] \
-            .count().asfreq("Q").fillna(0)
+        st.subheader("Forecast Settings")
+
+        forecast_period = st.number_input(
+            "Enter Number of Periods to Forecast (Monthly / Quarterly)",
+            min_value=1, max_value=36, value=6, step=1
+        )
+        forecast_period = int(forecast_period)
 
         monthly_fc = holtwinters_auto_forecast(monthly, forecast_period, 12) \
             if (has_spot or has_champion) else None
 
-        quarterly_fc = holtwinters_auto_forecast(
-            quarterly, max(1, forecast_period // 3), 4
-        ) if has_team else None
-
-        # Apply event impact only on budget
-        def adjust(fc, val):
-            if fc is None: return None
-            fc2 = fc.copy()
-            fc2.iloc[1:] += val
-            return fc2
-
-        monthly_adj = adjust(monthly_fc, st.session_state.get("monthly_event_total", 0))
-        quarterly_adj = adjust(quarterly_fc, st.session_state.get("quarterly_event_total", 0))
+        quarterly_fc = holtwinters_auto_forecast(quarterly, forecast_period, 4) \
+            if has_team else None
 
         st.subheader("Required Budget (Next Period Only)")
 
         col_spot, col_champion, col_team = st.columns(3)
 
         def next_val(fc):
-            try: return fc.iloc[1]
-            except: return fc.iloc[-1]
+            try:
+                return fc.iloc[1]
+            except:
+                return fc.iloc[-1]
 
         if has_spot:
-            col_spot.metric("Spot Budget",
-                            f"₹{int(next_val(monthly_adj) * 2500):,}")
+            col_spot.metric("Spot - Next Month",
+                f"₹{int(next_val(monthly_fc)*2500):,}")
         else:
-            col_spot.metric("Spot Budget", "—")
+            col_spot.metric("Spot - Next Month", "—")
 
         if has_champion:
-            col_champion.metric("Champion Budget",
-                                f"₹{int(next_val(monthly_adj) * 5000):,}")
+            col_champion.metric("Champion - Next Quarter",
+                f"₹{int(next_val(monthly_fc)*5000):,}")
         else:
-            col_champion.metric("Champion Budget", "—")
+            col_champion.metric("Champion - Next Quarter", "—")
 
         if has_team:
-            col_team.metric("Team Budget",
-                            f"₹{int(next_val(quarterly_adj) * 1000):,}")
+            col_team.metric("Team - Next Quarter",
+                f"₹{int(next_val(quarterly_fc)*1000):,}")
         else:
-            col_team.metric("Team Budget", "—")
+            col_team.metric("Team - Next Quarter", "—")
 
+        # --------------- Graphs ----------------
         if has_spot or has_champion:
-            st.subheader("Monthly Forecast")
-
+            st.subheader("Monthly Forecast – Holt-Winters")
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=monthly.index, y=monthly, name="Actual"))
             fig.add_trace(go.Scatter(
-                x=monthly_fc.index, y=monthly_fc,
-                name="Forecast",
+                x=monthly_fc.index, y=monthly_fc, name="Forecast",
                 line=dict(color="green", width=4, dash="dash")
             ))
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(monthly_fc.to_frame("Predicted Count"))
 
         if has_team:
-            st.subheader("Quarterly Forecast")
-
+            st.subheader("Quarterly Forecast – Holt-Winters")
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=quarterly.index, y=quarterly, name="Actual"))
             fig.add_trace(go.Scatter(
-                x=quarterly_fc.index, y=quarterly_fc,
-                name="Forecast",
+                x=quarterly_fc.index, y=quarterly_fc, name="Forecast",
                 line=dict(color="green", width=4, dash="dash")
             ))
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(quarterly_fc.to_frame("Predicted Count"))
 
     # ============================================================
-    # TAB 3 — METHODOLOGY
+    # TAB 3 — Methodology
     # ============================================================
 
     with tab2:
@@ -305,8 +320,7 @@ def show_coupon_estimation():
 
         perf_df = pd.DataFrame({
             "Model": ["Holt-Winters", "ARIMA (2,1,0)",
-                      "SARIMA ((2,1,0),(0,0,0,4))",
-                      "Moving Average"],
+                      "SARIMA ((2,1,0),(0,0,0,4))", "Moving Average"],
             "MAE": [12.11, 13.60, 14.29, 15.66],
             "RMSE": [18.14, 19.09, 18.69, 21.50],
             "MAPE (%)": [41.32, 49.93, 56.97, 59.47]
