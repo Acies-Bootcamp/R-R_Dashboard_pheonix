@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
 
 # -------------------------------------------------
 # Global Glass / KPI CSS
@@ -75,8 +76,14 @@ def show_recognition_individual_tab():
     df = pd.read_csv(url)
 
     # ---------------- CLEAN DATA ----------------
+    # Defensive: ensure expected columns exist; if not, create placeholders to avoid KeyErrors later
+    expected_cols = ["Team name", "Employee Name", "year", "Award Date", "New_Award_title"]
+    for c in expected_cols:
+        if c not in df.columns:
+            df[c] = pd.NA
+
     df["Team name"] = df["Team name"].fillna("Unknown Team")
-    df["Employee Name"] = df["Employee Name"].astype(str)
+    df["Employee Name"] = df["Employee Name"].astype(str).fillna("Unknown")
     df["year"] = pd.to_numeric(df["year"], errors="coerce")
 
     # Add month if available
@@ -102,13 +109,21 @@ def show_recognition_individual_tab():
         selected_years = st.multiselect(
             "Select Year(s)",
             year_options,
-            default=["All"],
+            default=["All"] if year_options else [],
             key="ind_years_multiselect",
         )
 
     temp_df = df.copy()
-    if "All" not in selected_years:
-        temp_df = temp_df[temp_df["year"].isin([int(y) for y in selected_years])]
+    if selected_years and "All" not in selected_years:
+        # convert back to ints safely
+        years_int = []
+        for y in selected_years:
+            try:
+                years_int.append(int(y))
+            except Exception:
+                pass
+        if years_int:
+            temp_df = temp_df[temp_df["year"].isin(years_int)]
 
     # ------------------ AWARD TYPE (OTA REMOVED IN FILTER OPTIONS ONLY) ------------------
     with f2:
@@ -129,7 +144,7 @@ def show_recognition_individual_tab():
             key="ind_awards_multiselect",
         )
 
-    if "All" not in selected_awards:
+    if selected_awards and "All" not in selected_awards:
         temp_df = temp_df[temp_df["New_Award_title"].isin(selected_awards)]
 
     # ------------------ TEAM ------------------
@@ -141,7 +156,7 @@ def show_recognition_individual_tab():
             key="ind_team_selectbox",
         )
 
-    if selected_team != "All":
+    if selected_team and selected_team != "All":
         temp_df = temp_df[temp_df["Team name"] == selected_team]
 
     # ------------------ EMPLOYEE ------------------
@@ -153,7 +168,7 @@ def show_recognition_individual_tab():
             key="ind_employee_selectbox",
         )
 
-    if selected_employee != "All":
+    if selected_employee and selected_employee != "All":
         temp_df = temp_df[temp_df["Employee Name"] == selected_employee]
 
     # ---------------- CLEAR BUTTON ----------------
@@ -177,7 +192,7 @@ def show_recognition_individual_tab():
     # 🔥 UPDATED: Exclude OTA Awards only for KPI calculations
     # ----------------------------------------------------------
     kpi_df = filtered_df[
-        ~filtered_df["New_Award_title"].str.contains("ota", case=False, na=False)
+        ~filtered_df["New_Award_title"].astype(str).str.contains("ota", case=False, na=False)
     ]   # <-- Only KPI uses this
     # ----------------------------------------------------------
 
@@ -189,9 +204,9 @@ def show_recognition_individual_tab():
     # 🔥 UPDATED: employee award counts without OTA
     employee_awards = kpi_df.groupby("Employee Name")["New_Award_title"].count()
 
-    top_performer_awards = employee_awards.max() if len(employee_awards) else 0
-    employees_with_multiple = (employee_awards > 1).sum()
-    recognition_rate = (employees_with_multiple / total_employees * 100) if total_employees else 0
+    top_performer_awards = int(employee_awards.max()) if len(employee_awards) else 0
+    employees_with_multiple = int((employee_awards > 1).sum())
+    recognition_rate = (employees_with_multiple / total_employees * 100) if total_employees else 0.0
 
     # KPI Layout
     k1, k2, k4, k5 = st.columns(4)
@@ -265,114 +280,177 @@ def show_recognition_individual_tab():
     st.markdown("---")
 
     st.subheader("📌 Recognition Distribution Histogram")
-    award_counts_df = employee_awards.reset_index(name="Awards Count")
-
-    fig3 = px.histogram(award_counts_df, x="Awards Count", nbins=20)
-    fig3.update_layout(height=400)
-    st.plotly_chart(fig3, use_container_width=True)
+    # award_counts_df uses KPI employee_awards (OTA excluded) — if empty, show message
+    if len(employee_awards):
+        award_counts_df = employee_awards.reset_index(name="Awards Count")
+        fig3 = px.histogram(award_counts_df, x="Awards Count", nbins=20)
+        fig3.update_layout(height=400)
+        st.plotly_chart(fig3, use_container_width=True)
+    else:
+        st.info("No (non-OTA) award counts available for histogram.")
 
     st.markdown("---")
 
     st.subheader("🎯 Award Types by Top Performers (Treemap)")
 
-    top_10 = employee_awards.nlargest(10).index
-    top_df = filtered_df[filtered_df["Employee Name"].isin(top_10)]
+    if len(employee_awards):
+        top_10 = employee_awards.nlargest(10).index
+        top_df = filtered_df[filtered_df["Employee Name"].isin(top_10)]
 
-    award_type_counts = (
-        top_df.groupby(["Employee Name", "New_Award_title"])
-        .size()
-        .reset_index(name="Count")
-    )
-
-    if len(award_type_counts):
-        fig4 = px.treemap(
-            award_type_counts,
-            path=["Employee Name", "New_Award_title"],
-            values="Count",
-            color="Count",
-            color_continuous_scale="Blues",
+        award_type_counts = (
+            top_df.groupby(["Employee Name", "New_Award_title"])
+            .size()
+            .reset_index(name="Count")
         )
-        fig4.update_layout(height=600)
-        st.plotly_chart(fig4, use_container_width=True)
+
+        if len(award_type_counts):
+            fig4 = px.treemap(
+                award_type_counts,
+                path=["Employee Name", "New_Award_title"],
+                values="Count",
+                color="Count",
+                color_continuous_scale="Blues",
+            )
+            fig4.update_layout(height=600)
+            st.plotly_chart(fig4, use_container_width=True)
+        else:
+            st.info("No award data available for top performers.")
     else:
-        st.info("No award data available.")
+        st.info("Not enough data to compute top performers treemap.")
 
     st.markdown("---")
 
     st.subheader("🏆 Top 20 Recipients - Detailed View")
 
-    top20 = (
-        filtered_df.groupby(["Employee Name", "Team name"])
-        .agg({"New_Award_title": ["count", lambda x: ", ".join(x.unique()[:3])]}).reset_index()
-    )
-    top20.columns = ["Employee Name", "Team", "Total Awards", "Award Types (Sample)"]
-    top20 = top20.sort_values("Total Awards", ascending=False).head(20)
+    if len(filtered_df):
+        top20 = (
+            filtered_df.groupby(["Employee Name", "Team name"])
+            .agg({"New_Award_title": ["count", lambda x: ", ".join(x.dropna().unique()[:3])]})
+            .reset_index()
+        )
+        top20.columns = ["Employee Name", "Team", "Total Awards", "Award Types (Sample)"]
+        top20 = top20.sort_values("Total Awards", ascending=False).head(20)
 
-    st.dataframe(
-        top20.style.background_gradient(subset=["Total Awards"], cmap="YlOrRd"),
-        use_container_width=True,
-        height=400
-    )
+        st.dataframe(
+            top20.style.background_gradient(subset=["Total Awards"], cmap="YlOrRd"),
+            use_container_width=True,
+            height=400
+        )
+    else:
+        st.info("No award records to show top recipients.")
 
     st.markdown("---")
 
     st.subheader("⚠ Recognition Gap Analysis")
 
-    summary = (
-        filtered_df.groupby("Employee Name")
-        .agg({"New_Award_title": "count", "Team name": "first"}).reset_index()
-    )
-    summary.columns = ["Employee Name", "Awards", "Team"]
-
-    low_rec = summary[summary["Awards"] <= 2].sort_values("Awards").head(20)
-
-    if len(low_rec):
-        st.dataframe(
-            low_rec.style.background_gradient(subset=["Awards"], cmap="RdYlGn"),
-            use_container_width=True,
-            height=400,
+    if len(filtered_df):
+        summary = (
+            filtered_df.groupby("Employee Name")
+            .agg({"New_Award_title": "count", "Team name": "first"}).reset_index()
         )
-        st.info(f"{len(low_rec)} employees have low recognition (≤ 2 awards).")
+        summary.columns = ["Employee Name", "Awards", "Team"]
+
+        low_rec = summary[summary["Awards"] <= 2].sort_values("Awards").head(20)
+
+        if len(low_rec):
+            st.dataframe(
+                low_rec.style.background_gradient(subset=["Awards"], cmap="RdYlGn"),
+                use_container_width=True,
+                height=400,
+            )
+            st.info(f"{len(low_rec)} employees have low recognition (≤ 2 awards).")
+        else:
+            st.success("All employees received 3+ awards!")
     else:
-        st.success("All employees received 3+ awards!")
+        st.info("No filtered employee award data to analyze gaps.")
 
     st.subheader("📉 Team-Level Recognition Gaps")
 
+    # compute team awards and team sizes from the full df (not filtered_df) — that is consistent with your original code
     team_awards = df.groupby("Team name")["New_Award_title"].count().reset_index()
     team_size = df.groupby("Team name")["Employee Name"].nunique().reset_index()
 
-    team_gap = pd.merge(team_awards, team_size, on="Team name")
+    team_gap = pd.merge(team_awards, team_size, on="Team name", how="outer")
     team_gap.columns = ["Team", "Total Awards", "Total Employees"]
-    team_gap["Awards per Employee"] = (
-        team_gap["Total Awards"] / team_gap["Total Employees"]
-        if (team_gap["Total Employees"] != 0).all() else 0
-    )
 
-    overall_avg = team_gap["Awards per Employee"].mean()
+    # Ensure numeric, replace zeros where appropriate and avoid dividing by zero
+    team_gap["Total Awards"] = pd.to_numeric(team_gap["Total Awards"].fillna(0), errors="coerce").fillna(0)
+    team_gap["Total Employees"] = pd.to_numeric(team_gap["Total Employees"].fillna(0), errors="coerce").fillna(0)
+
+    # Vectorized safe division: when employees == 0, result will be np.nan -> fill with 0
+    team_gap["Awards per Employee"] = team_gap["Total Awards"] / team_gap["Total Employees"].replace({0: np.nan})
+    team_gap["Awards per Employee"] = team_gap["Awards per Employee"].fillna(0.0)
+
+    overall_avg = team_gap["Awards per Employee"].mean() if len(team_gap) else 0.0
 
     team_gap["Gap Flag"] = team_gap["Awards per Employee"].apply(
         lambda x: "Low" if x < overall_avg * 0.5
         else ("Moderate" if x < overall_avg else "Good")
     )
 
+    # ---------------- SAFE SLIDER: filter teams by Awards per Employee --------------
+    # Streamlit slider requires min < max. We'll compute min/max and guard if equal.
+    min_val = float(team_gap["Awards per Employee"].min()) if len(team_gap) else 0.0
+    max_val = float(team_gap["Awards per Employee"].max()) if len(team_gap) else 1.0
+
+    # If all values equal (min == max), bump max slightly so slider works
+    if np.isclose(min_val, max_val):
+        max_val = min_val + max(0.01, abs(min_val) * 0.01)
+
+    # Offer the slider (float) with small step
+    threshold = st.slider(
+        "Minimum Awards per Employee to display teams",
+        min_value=min_val,
+        max_value=max_val,
+        value=min_val,
+        step=(max_val - min_val) / 100 if (max_val - min_val) > 0 else 0.01,
+        format="%.2f",
+        key="team_threshold_slider"
+    )
+
+    display_team_gap = team_gap[team_gap["Awards per Employee"] >= threshold].sort_values(
+        "Awards per Employee", ascending=False
+    )
+
     st.dataframe(
-        team_gap.style.background_gradient(subset=["Awards per Employee"], cmap="YlOrRd"),
+        display_team_gap.style.background_gradient(subset=["Awards per Employee"], cmap="YlOrRd"),
         use_container_width=True
     )
 
+    st.markdown("---")
+
     st.subheader("🚫 Employees With Zero Awards")
 
-    all_employees = df["Employee Name"].unique()
-    awarded_employees = df["Employee Name"].unique()
-
-    zero_awards = list(set(all_employees) - set(awarded_employees))
-    zero_awards_df = pd.DataFrame({"Employee Name": zero_awards})
+    # The original code attempted to find zero-award employees by comparing all_employees vs awarded_employees
+    # but both were sourced from the same df with awards, so that results in an empty set.
+    # We'll only compute zero-awards if the sheet provides a full employee roster (column name 'All Employees' or 'Employee Roster')
+    roster_col_candidates = [c for c in df.columns if c.lower() in ("all employees", "employee roster", "employee_list", "roster")]
+    if roster_col_candidates:
+        roster_col = roster_col_candidates[0]
+        all_employees = pd.Series(df[roster_col].dropna().unique()).astype(str)
+        awarded_employees = pd.Series(df[df["New_Award_title"].notna()]["Employee Name"].unique()).astype(str)
+        zero_awards = list(set(all_employees) - set(awarded_employees))
+        zero_awards_df = pd.DataFrame({"Employee Name": sorted(zero_awards)})
+    else:
+        # No roster available in the loaded sheet — inform user and skip
+        zero_awards_df = pd.DataFrame()
+        st.info("No full employee roster found in the sheet — cannot compute employees with zero awards. "
+                "If you have a roster column, name it 'All Employees' or 'Employee Roster'.")
 
     if len(zero_awards_df):
-        zero_awards_df["Team"] = zero_awards_df["Employee Name"].apply(
-            lambda x: df[df["Employee Name"] == x]["Team name"].iloc[0]
-        )
+        # try to find team where possible
+        def find_team_for_emp(emp):
+            subset = df[df["Employee Name"].astype(str) == str(emp)]
+            if len(subset) and subset["Team name"].notna().any():
+                return subset["Team name"].iloc[0]
+            return "Unknown Team"
+
+        zero_awards_df["Team"] = zero_awards_df["Employee Name"].apply(find_team_for_emp)
         st.dataframe(zero_awards_df, use_container_width=True)
         st.warning(f"{len(zero_awards_df)} employees have zero recognition.")
     else:
-        st.success("No employees with zero awards!")
+        if roster_col_candidates:
+            st.success("No employees with zero awards (based on provided roster).")
+        else:
+            # Already displayed info() above explaining absence of roster
+            pass
