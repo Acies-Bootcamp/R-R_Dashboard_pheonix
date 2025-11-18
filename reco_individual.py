@@ -230,8 +230,7 @@ def show_recognition_individual_tab():
         st.markdown(
             f"""
             <div class="metric-card"><h4>
-            <span class="kpi-label">Individual With the Highest Number of Awards
-            <span class="kpi-help" title="Highest award count.">?</span></span></h4>
+            <span class="kpi-label">Highest Number of Awards for an Individual<span class="kpi-help" title="Highest award count.">?</span></span></h4>
             <h2>{top_performer_awards}</h2></div>
             """, unsafe_allow_html=True)
 

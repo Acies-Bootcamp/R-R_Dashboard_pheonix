@@ -15,7 +15,6 @@ AWARD_COLORS = {
     "OTA": "#FFCCCB",
 }
 
-
 ANALYSIS_AWARD_TYPES = [
     "Team Award",
     "Spot Award",
@@ -23,9 +22,7 @@ ANALYSIS_AWARD_TYPES = [
     "Awesome Award",
 ]
 
-
 # ===================== TEAM NORMALIZATION =====================
-# Canonical mapping for team names (Edgecore, Greenmath, Greenmath Launch, etc.)
 TEAM_NORMALIZATION = {
     "edgecore": "Edgecore",
     "edge core": "Edgecore",
@@ -37,7 +34,6 @@ TEAM_NORMALIZATION = {
 }
 
 
-
 def normalize_name(name):
     if pd.isna(name):
         return name
@@ -47,15 +43,9 @@ def normalize_name(name):
     return name
 
 
-
 def canonical_team(name: str) -> str:
     """
     Normalize and map raw team names into canonical labels.
-
-    Examples:
-    - "edge core" / "EdgeCore" -> "Edgecore"
-    - "greenmath launch" variants -> "Greenmath Launch"
-    - plain "greenmath" -> "Greenmath"
     """
     if not isinstance(name, str):
         return ""
@@ -65,6 +55,36 @@ def canonical_team(name: str) -> str:
     # fallback: cleaned title-case original
     return name.strip().title()
 
+
+def is_unknown_team(name) -> bool:
+    """
+    Return True if the team name is empty / NaN / or some 'Unknown...' placeholder.
+    These rows will be excluded from team-based charts.
+    """
+    if pd.isna(name):
+        return True
+
+    s = str(name).strip().lower()
+    if not s:
+        return True
+
+    # simple exact placeholders
+    if s in {"nan", "none", "-", "unknown", "unknown team", "unknown team name", "unassigned"}:
+        return True
+
+    # normalise non-letters to spaces and look for 'unknown' token
+    s_clean = re.sub(r"[^a-z]", " ", s)
+    tokens = s_clean.split()
+
+    # e.g. "unknown team name_aw", "unknown team name aw", etc.
+    if "unknown" in tokens:
+        return True
+
+    # extra safety: any string that starts with "unknown"
+    if s.startswith("unknown"):
+        return True
+
+    return False
 
 
 def map_sankey_bucket(title: str) -> str | None:
@@ -81,7 +101,6 @@ def map_sankey_bucket(title: str) -> str | None:
     return None
 
 
-
 @st.cache_data
 def load_data():
     sheet_key = "1xVpXomZBOyIeyvpyDjXQlSEIfU35v6j0jkhdaETm4-Q"
@@ -92,9 +111,18 @@ def load_data():
     df["year"] = pd.to_numeric(df["year"], errors="coerce")
 
     month_map = {
-        "January": 1, "February": 2, "March": 3, "April": 4,
-        "May": 5, "June": 6, "July": 7, "August": 8,
-        "September": 9, "October": 10, "November": 11, "December": 12,
+        "January": 1,
+        "February": 2,
+        "March": 3,
+        "April": 4,
+        "May": 5,
+        "June": 6,
+        "July": 7,
+        "August": 8,
+        "September": 9,
+        "October": 10,
+        "November": 11,
+        "December": 12,
     }
     df["Month_Num"] = df["Month"].map(month_map)
     df["Date"] = pd.to_datetime(
@@ -104,24 +132,16 @@ def load_data():
 
     df["New_Award_title"] = df["New_Award_title"].astype(str).str.title().str.strip()
 
-    # 🔹 Clean + canonicalise team names (this is where Edgecore / Greenmath mapping is applied)
+    # canonicalise team names
     df["Team name"] = df["Team name"].astype(str).apply(canonical_team)
 
     return df
 
 
-
 def show_award_analysis():
     """
     Render the award analysis dashboard.
-
-    This function applies the global styling defined in ``styles.apply_styles()``
-    and then loads the award data.  The additional CSS previously used to
-    override the body background and card styling has been removed so that
-    the Acies gradient defined in the global styles remains visible.  Metric
-    cards and chart containers inherit their appearance from ``styles.py``.
     """
-    # Apply global styles using the selected theme
     theme = st.session_state.get("theme", "White")
     styles.apply_styles(theme=theme)
 
@@ -131,6 +151,7 @@ def show_award_analysis():
     with st.container():
         col1, col2, col3, col4 = st.columns(4)
 
+        # Period selector
         with col1:
             period = st.selectbox(
                 "Select Period",
@@ -138,20 +159,21 @@ def show_award_analysis():
                 index=0,
             )
 
+        # Year selector
         with col2:
-            years = sorted(df["year"].dropna().unique())
+            years = sorted(df["year"].dropna().astype(int).unique())
             year_options = ["All"] + list(years)
+
             selected_years_raw = st.multiselect(
                 "Select Year(s)",
                 options=year_options,
                 default=["All"],
             )
+
             if "All" in selected_years_raw or not selected_years_raw:
-                selected_years = years
+                selected_years = list(years)
             else:
-                selected_years = [
-                    y for y in selected_years_raw if isinstance(y, (int, float))
-                ]
+                selected_years = [int(y) for y in selected_years_raw if y != "All"]
 
         with col3:
             award_type_options = ["All"] + ANALYSIS_AWARD_TYPES
@@ -190,6 +212,7 @@ def show_award_analysis():
                 "Filter by Location", loc_options, default=["All"]
             )
 
+    # ========= APPLY FILTERS =========
     df_filtered = df[
         (df["year"].isin(selected_years))
         & (df["New_Award_title"].isin(award_types))
@@ -219,15 +242,15 @@ def show_award_analysis():
         st.info("No data available for the current filters.")
         return
 
+    # ========= KPIs =========
     total_awards = len(df_filtered)
     old_title_count = df[df["Nominated In"].str.lower() == "all-hands"]["Award Title"].nunique()
     new_title_count = len(ANALYSIS_AWARD_TYPES)
 
-    # 🔹 Top team now uses canonicalised team names
+    # Top team (exclude unknowns)
     team_awards_only = df_filtered[
         (df_filtered["New_Award_title"] == "Team Award")
-        & (df_filtered["Team name"].notna())
-        & (df_filtered["Team name"].str.strip() != "")
+        & (~df_filtered["Team name"].apply(is_unknown_team))
     ]
     if not team_awards_only.empty:
         top_team = team_awards_only["Team name"].value_counts().idxmax()
@@ -304,6 +327,7 @@ def show_award_analysis():
 
     st.divider()
 
+    # ========= SANKEY =========
     st.markdown(
         "<p class='section-title'>Award Title Mapping (Sankey)</p>",
         unsafe_allow_html=True,
@@ -332,6 +356,11 @@ def show_award_analysis():
 
     sankey_targets = sorted(df_for_sankey["Sankey_Target"].unique())
 
+    def clean_team_list(series):
+        unique = {t.strip() for t in series.astype(str)}
+        unique = {t for t in unique if not is_unknown_team(t)}
+        return ", ".join(sorted(unique)) if unique else "No team info"
+
     if not sankey_targets:
         st.info("No Sankey targets (Team / Spot / OTA) in current filters.")
     else:
@@ -352,11 +381,10 @@ def show_award_analysis():
                     .reset_index(name="Count")
                 )
 
-                # 🔹 Build mapping: Award Title -> comma-separated (canonical) team names
                 team_names_by_title = (
                     sankey_df.dropna(subset=["Award Title", "Team name"])
                     .groupby("Award Title")["Team name"]
-                    .apply(lambda s: ", ".join(sorted(set(s.astype(str).str.strip()))))
+                    .apply(clean_team_list)
                     .to_dict()
                 )
 
@@ -373,7 +401,6 @@ def show_award_analysis():
                 ]
                 values = sankey_group["Count"].tolist()
 
-                # 🔹 Customdata: team names for each old title
                 link_customdata = [
                     team_names_by_title.get(row["Award Title"], "No team info")
                     for _, row in sankey_group.iterrows()
@@ -397,7 +424,6 @@ def show_award_analysis():
                                 value=values,
                                 color=[link_color] * len(values),
                                 customdata=link_customdata,
-                                # 👇 Hover: ONLY show team name(s)
                                 hovertemplate="Teams: %{customdata}<extra></extra>",
                             ),
                         )
@@ -415,6 +441,7 @@ def show_award_analysis():
 
     st.divider()
 
+    # ========= MOST FREQUENT AWARDS =========
     st.markdown(
         "<p class='section-title'>Most Frequently Given Awards</p>",
         unsafe_allow_html=True,
@@ -436,6 +463,7 @@ def show_award_analysis():
     fig1.update_layout(template="plotly_white", height=500)
     st.plotly_chart(fig1, use_container_width=True)
 
+    # ========= TEAM TREEMAP =========
     st.markdown(
         "<p class='section-title'>Team-Wise Award Distribution (Treemap)</p>",
         unsafe_allow_html=True,
@@ -446,9 +474,7 @@ def show_award_analysis():
         .size()
         .reset_index(name="Award Count")
     )
-    team_awards = team_awards[
-        ~team_awards["Team name"].isin(["", "Nan", "-", None])
-    ]
+    team_awards = team_awards[~team_awards["Team name"].apply(is_unknown_team)]
 
     if not team_awards.empty:
         fig2 = px.treemap(
@@ -464,29 +490,31 @@ def show_award_analysis():
     else:
         st.info("Not enough data for the treemap with current filters.")
 
+    # ========= TOP TEAMS LEADERBOARD =========
     st.markdown(
         "<p class='section-title'>Top Award-Winning Teams</p>",
         unsafe_allow_html=True,
     )
 
-    # ✅ UPDATED: Composite score considering both people and awards
+    df_leader = df_filtered[~df_filtered["Team name"].apply(is_unknown_team)].copy()
+
     leaderboard = (
-        df_filtered.groupby("Team name")
+        df_leader.groupby("Team name")
         .agg(
-            People_Count=('Employee Name', 'nunique'),
-            Award_Count=('New_Award_title', 'count')
+            People_Count=("Employee Name", "nunique"),
+            Award_Count=("New_Award_title", "count"),
         )
         .reset_index()
     )
-    
-    # Calculate composite score: (People × 0.6) + (Awards × 0.4)
-    # This gives 60% weight to people and 40% to awards
-    leaderboard['Recognition_Score'] = (
-        (leaderboard['People_Count'] * 0.6) + 
-        (leaderboard['Award_Count'] * 0.4)
+
+    leaderboard["Recognition_Score"] = (
+        (leaderboard["People_Count"] * 0.6)
+        + (leaderboard["Award_Count"] * 0.4)
     ).round(2)
-    
-    leaderboard = leaderboard.sort_values(by="Recognition_Score", ascending=False).head(10)
+
+    leaderboard = leaderboard.sort_values(
+        by="Recognition_Score", ascending=False
+    ).head(10)
 
     if not leaderboard.empty:
         fig3 = px.bar(
@@ -497,14 +525,20 @@ def show_award_analysis():
             text="Recognition_Score",
             title="Top 10 Teams by Recognition Score (People + Awards)",
             hover_data={
-                "People_Count": True, 
-                "Award_Count": True, 
-                "Recognition_Score": True
+                "People_Count": True,
+                "Award_Count": True,
+                "Recognition_Score": True,
             },
         )
         fig3.update_traces(
             textposition="outside",
-            hovertemplate="<b>%{x}</b><br>Recognition Score: %{y:.2f}<br>People: %{customdata[0]}<br>Awards: %{customdata[1]}<extra></extra>"
+            hovertemplate=(
+                "<b>%{x}</b><br>"
+                "Recognition Score: %{y:.2f}<br>"
+                "People: %{customdata[0]}<br>"
+                "Awards: %{customdata[1]}"
+                "<extra></extra>"
+            ),
         )
         fig3.update_layout(
             template="plotly_white",
@@ -514,15 +548,15 @@ def show_award_analysis():
             yaxis_title="Recognition Score",
         )
         st.plotly_chart(fig3, use_container_width=True)
-        
+
         st.caption(
             "**Recognition Score** = (People Count × 0.6) + (Award Count × 0.4) — "
             "This balanced metric considers both team size and total awards received."
         )
-
     else:
         st.info("No team data available for the current filters.")
 
+    # ========= AWARD GROWTH OVER TIME =========
     st.markdown(
         "<p class='section-title'>Award Growth Over Time</p>",
         unsafe_allow_html=True,
@@ -547,7 +581,6 @@ def show_award_analysis():
             title="Recognition Timeline by Award Type",
         )
 
-        # Stronger, darker lines + bigger marker points
         fig_time.update_traces(
             mode="lines+markers",
             line=dict(width=3.5, color=None),
@@ -566,7 +599,6 @@ def show_award_analysis():
         fig_time.update_yaxes(showgrid=True, gridcolor="rgba(0,0,0,0.1)")
 
         st.plotly_chart(fig_time, use_container_width=True)
-
 
 
 if __name__ == "__main__":
