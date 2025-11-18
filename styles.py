@@ -1,16 +1,24 @@
 """
 Centralised styling for the R&R dashboard.
 
+<<<<<<< HEAD
 This module defines styling functions and utilities including CSS injection
 and Excel export capabilities. By consolidating fonts, colours, component
 styling and export functions into one place, we ensure a uniform look and
 feel across all pages.
+=======
+This module defines a single function, `apply_styles()`, which injects
+consistent CSS into the Streamlit app.  By consolidating fonts,
+colours and component styling into one place, we ensure a uniform
+look and feel across all pages.
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
 Usage:
 
 ```python
 import styles
 styles.apply_styles()
+<<<<<<< HEAD
 
 # For Excel export
 excel_file = styles.create_excel_download(df, "report.xlsx")
@@ -20,26 +28,38 @@ st.download_button(
     file_name="report.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+=======
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 ```
 
 This should be called at the top of each page or main function before
 rendering any UI elements.
 """
 import streamlit as st
+<<<<<<< HEAD
 import pandas as pd
 from io import BytesIO
 from typing import Dict, Optional
 
 
 def apply_styles(theme: str = "blue"):
+=======
+
+def apply_styles(theme: str = "White"):
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     """Inject global CSS for the dashboard with a selectable colour theme.
 
     Parameters
     ----------
     theme : str, optional
         Name of the colour theme to use.  Supported values are
+<<<<<<< HEAD
         "blue", "yellow", and "white" (case‑insensitive).  The
         default is "blue".
+=======
+        "White", "yellow", and "white" (case‑insensitive).  The
+        default is "White".
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
     This function generates CSS rules on the fly based on the chosen
     theme.  It also updates Plotly's default colour palette for
@@ -49,10 +69,17 @@ def apply_styles(theme: str = "blue"):
     start of every page after any theme selection is made.
     """
     import plotly.express as px
+<<<<<<< HEAD
     theme_key = theme.lower() if theme else "blue"
     # Define colour palettes for supported themes
     THEME_DEFINITIONS = {
         "blue": {
+=======
+    theme_key = theme.lower() if theme else "White"
+    # Define colour palettes for supported themes
+    THEME_DEFINITIONS = {
+        "White": {
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
             "gradient": ["#0D3C66", "#0979B7", "#4FC5FA"],
             "accent_dark": "#0D3C66",
             "accent_base": "#0979B7",
@@ -80,7 +107,11 @@ def apply_styles(theme: str = "blue"):
             "chart_palette": ["#0D3C66", "#0979B7", "#4FC5FA", "#F4C542", "#EF6B3F", "#8BC34A", "#E91E63"]
         }
     }
+<<<<<<< HEAD
     colours = THEME_DEFINITIONS.get(theme_key, THEME_DEFINITIONS["blue"])
+=======
+    colours = THEME_DEFINITIONS.get(theme_key, THEME_DEFINITIONS["White"])
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     # Update Plotly default discrete colour sequence for bright, high‑contrast charts
     px.defaults.color_discrete_sequence = colours["chart_palette"]
     # Build the CSS string with theme variables
@@ -230,6 +261,7 @@ def apply_styles(theme: str = "blue"):
         transform: translateY(-2px);
         background-color: {button_hover_bg};
     }}
+<<<<<<< HEAD
     
     /* Download button styling */
     .stDownloadButton > button {{
@@ -250,6 +282,11 @@ def apply_styles(theme: str = "blue"):
     """
     st.markdown(css, unsafe_allow_html=True)
     
+=======
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
 def show_spinner(duration: float = 1.0):
     """
@@ -317,6 +354,7 @@ def show_spinner(duration: float = 1.0):
     # Keep spinner on screen for the specified duration
     time.sleep(max(duration, 0.1))
     # Clear the spinner
+<<<<<<< HEAD
     placeholder.empty()
 
 
@@ -614,3 +652,6 @@ def create_download_section(
         )
     else:
         st.warning("Unable to create Excel file. Please check your data.")
+=======
+    placeholder.empty()
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3

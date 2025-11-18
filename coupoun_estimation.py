@@ -7,6 +7,16 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 warnings.filterwarnings("ignore")
 
+
+# ============================================================
+# ✅ GLOSSARY HELPER - COLLAPSIBLE EXPANDER
+# ============================================================
+def show_glossary(title: str, description: str):
+    """Display a collapsible glossary expander below charts"""
+    with st.expander(f"📖 {title}", expanded=False):
+        st.markdown(description)
+
+
 # ============================================================
 # CLEANING UTILITIES
 # ============================================================
@@ -15,6 +25,7 @@ def safe_numeric(s):
     s = s.astype(str).str.replace(",", "", regex=False)
     s = s.str.extract(r"(-?\d+\.?\d*)")[0]
     return pd.to_numeric(s, errors="coerce")
+
 
 def create_date(df):
     # Handle Month as full name, short name or number
@@ -53,6 +64,7 @@ def fix_frequency(freqstr):
 # ============================================================
 
 AWARD_BUDGET = {"spot": 2500, "team": 1000, "champion": 5000}
+
 
 def get_award_type(award_name):
     nm = award_name.lower()
@@ -125,6 +137,7 @@ def _holt_winters_forecast(series, periods, seasonal_period):
 
     return fallback()
 
+
 @st.cache_data(show_spinner=False)
 def holtwinters_auto_forecast(series, periods, seasonal_period):
     return _holt_winters_forecast(series, periods, seasonal_period)
@@ -142,64 +155,9 @@ def show_coupon_estimation():
         "Methodology"
     ])
 
-    # ============================================================
-    # TAB EVENTS — Editable Event Table
-    # ============================================================
-
-    with tab_events:
-
-        st.header("Event & Team Size Inputs (Editable Table)")
-        st.info("Add Hiring Drives, Workshops, Launches etc. — impact affects *only budgets*, not graphs.")
-
-        # Initial table load
-        if "event_table" not in st.session_state:
-            st.session_state["event_table"] = pd.DataFrame([
-                {"Event": "Hiring Drive", "Team Size": 120,
-                 "Impact %": 20.0, "Frequency": "Quarterly"},
-                {"Event": "Workshop", "Team Size": 60,
-                 "Impact %": 10.0, "Frequency": "Monthly"},
-            ])
-
-        edited = st.data_editor(
-            st.session_state["event_table"],
-            num_rows="dynamic",
-            hide_index=True,
-            use_container_width=True,
-            column_config={
-                "Event": st.column_config.TextColumn("Event"),
-                "Team Size": st.column_config.NumberColumn("Team Size"),
-                "Impact %": st.column_config.NumberColumn("Impact %"),
-                "Frequency": st.column_config.SelectboxColumn(
-                    "Frequency",
-                    options=["Monthly", "Quarterly"]
-                )
-            }
-        )
-
-        # Save back to session state
-        st.session_state["event_table"] = edited
-
-        # Compute impact
-        event_df = edited.copy()
-        event_df["Team Size"] = pd.to_numeric(event_df["Team Size"], errors="coerce").fillna(0)
-        event_df["Impact %"] = pd.to_numeric(event_df["Impact %"], errors="coerce").fillna(0)
-        event_df["Impact Count"] = event_df["Team Size"] * (event_df["Impact %"] / 100)
-
-        st.subheader("Impact Summary")
-        st.dataframe(event_df, use_container_width=True)
-
-        st.session_state["monthly_event_total"] = \
-            event_df.loc[event_df["Frequency"] == "Monthly", "Impact Count"].sum()
-
-        st.session_state["quarterly_event_total"] = \
-            event_df.loc[event_df["Frequency"] == "Quarterly", "Impact Count"].sum()
-
-        st.success(f"Monthly Impact: {st.session_state['monthly_event_total']:.2f}")
-        st.success(f"Quarterly Impact: {st.session_state['quarterly_event_total']:.2f}")
-
-    # ============================================================
-    # TAB 1 — FORECASTING DASHBOARD
-    # ============================================================
+    # ========================================================
+    # TAB 1 — FORECASTING
+    # ========================================================
 
     with tab1:
 
@@ -242,18 +200,15 @@ def show_coupon_estimation():
 
         has_spot, has_team, has_champion = get_award_type(award_filter)
 
-        monthly = df_f.groupby(pd.Grouper(key="Date", freq="M"))["Coupon Amount"].count().asfreq("M").fillna(0)
-        quarterly = df_f.groupby(pd.Grouper(key="Date", freq="Q"))["Coupon Amount"].count().asfreq("Q").fillna(0)
+        # Time series
+        monthly = df_f.groupby(pd.Grouper(key="Date", freq="M"))["Coupon Amount"] \
+                       .count().asfreq("M").fillna(0)
 
-        st.subheader("Forecast Settings")
+        quarterly = df_f.groupby(pd.Grouper(key="Date", freq="Q"))["Coupon Amount"] \
+                         .count().asfreq("Q").fillna(0)
 
-        forecast_period = st.number_input(
-            "Enter Number of Periods to Forecast (Monthly / Quarterly)",
-            min_value=1, max_value=36, value=6, step=1
-        )
-        forecast_period = int(forecast_period)
-
-        monthly_fc = holtwinters_auto_forecast(monthly, forecast_period, 12) \
+        # Forecasts
+        monthly_fc = holtwinters_auto_forecast(monthly, 6, 12) \
             if (has_spot or has_champion) else None
 
         quarterly_fc = holtwinters_auto_forecast(quarterly, forecast_period, 4) \
@@ -287,32 +242,57 @@ def show_coupon_estimation():
         else:
             col_team.metric("Team - Next Quarter", "—")
 
-        # --------------- Graphs ----------------
+        # =====================================================
+        # FIXED: SHOW CHAMPION GRAPH + GREEN THICK FORECAST LINE
+        # =====================================================
+
         if has_spot or has_champion:
             st.subheader("Monthly Forecast – Holt-Winters")
+
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=monthly.index, y=monthly, name="Actual"))
             fig.add_trace(go.Scatter(
-                x=monthly_fc.index, y=monthly_fc, name="Forecast",
+                x=monthly.index, y=monthly, name="Actual"
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=monthly_fc.index,
+                y=monthly_fc,
+                name="Forecast",
                 line=dict(color="green", width=4, dash="dash")
             ))
+
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(monthly_fc.to_frame("Predicted Count"))
 
+            # ✅ Add Glossary
+            show_glossary(
+                "Monthly Forecast Chart",
+                "This chart shows **historical award counts** (blue line with markers) and **forecasted values** (green dashed line with orange markers). "
+                "The **large orange markers** represent predicted future award counts for each month. "
+                "The **Holt-Winters model** smooths out random fluctuations and identifies underlying trends and seasonal patterns. "
+                "Use this forecast to anticipate award distribution patterns and plan accordingly."
+            )
+
         if has_team:
             st.subheader("Quarterly Forecast – Holt-Winters")
+
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=quarterly.index, y=quarterly, name="Actual"))
             fig.add_trace(go.Scatter(
-                x=quarterly_fc.index, y=quarterly_fc, name="Forecast",
+                x=quarterly.index, y=quarterly, name="Actual"
+            ))
+            fig.add_trace(go.Scatter(
+                x=quarterly_fc.index,
+                y=quarterly_fc,
+                name="Forecast",
                 line=dict(color="green", width=4, dash="dash")
             ))
+
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(quarterly_fc.to_frame("Predicted Count"))
 
-    # ============================================================
-    # TAB 3 — Methodology
-    # ============================================================
+    # ========================================================
+    # TAB 2 — METHODOLOGY
+    # ========================================================
 
     with tab2:
 
@@ -329,6 +309,16 @@ def show_coupon_estimation():
         st.subheader("Model Accuracy Comparison")
         st.dataframe(perf_df)
 
+        # ✅ Add Glossary for Model Comparison
+        show_glossary(
+            "Model Accuracy Metrics Explained",
+            "This table compares the performance of different forecasting models. "
+            "**MAE (Mean Absolute Error)**: Average absolute difference between predicted and actual values. Lower is better. "
+            "**RMSE (Root Mean Square Error)**: Penalizes larger errors more heavily. Lower is better. "
+            "**MAPE (Mean Absolute Percentage Error)**: Percentage-based error metric. Lower is better. "
+            "**Holt-Winters** was chosen because it has the **lowest MAE and MAPE**, making it the most accurate model for this dataset."
+        )
+
         st.subheader("Model Visualizations")
         c1, c2 = st.columns(2)
         c3, c4 = st.columns(2)
@@ -337,6 +327,7 @@ def show_coupon_estimation():
         c2.image("arima.png", caption="ARIMA Model", use_container_width=True)
         c3.image("sarima.png", caption="SARIMA Model", use_container_width=True)
         c4.image("mv.png", caption="Moving Average Model", use_container_width=True)
+
 
 
 # Run App

@@ -3,6 +3,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+<<<<<<< HEAD
+=======
+
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
 # -------------------------------------------------
 # Global Glass / KPI CSS
@@ -65,6 +69,15 @@ GLASS_KPI_CSS = """
 """
 
 
+# -----------------------
+# ✅ GLOSSARY HELPER - COLLAPSIBLE EXPANDER
+# -----------------------
+def show_glossary(title: str, description: str):
+    """Display a collapsible glossary expander below charts"""
+    with st.expander(f"📖 {title}", expanded=False):
+        st.markdown(description)
+
+
 def show_recognition_individual_tab():
     """Display individual recognition analysis with filters, KPIs, and insights"""
 
@@ -76,7 +89,10 @@ def show_recognition_individual_tab():
     df = pd.read_csv(url)
 
     # ---------------- CLEAN DATA ----------------
+<<<<<<< HEAD
     # Defensive: ensure expected columns exist; if not, create placeholders to avoid KeyErrors later
+=======
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     expected_cols = ["Team name", "Employee Name", "year", "Award Date", "New_Award_title"]
     for c in expected_cols:
         if c not in df.columns:
@@ -86,7 +102,6 @@ def show_recognition_individual_tab():
     df["Employee Name"] = df["Employee Name"].astype(str).fillna("Unknown")
     df["year"] = pd.to_numeric(df["year"], errors="coerce")
 
-    # Add month if available
     if "month" not in df.columns and "Award Date" in df.columns:
         df["Award Date"] = pd.to_datetime(df["Award Date"], errors="coerce")
         df["month"] = df["Award Date"].dt.month
@@ -115,7 +130,10 @@ def show_recognition_individual_tab():
 
     temp_df = df.copy()
     if selected_years and "All" not in selected_years:
+<<<<<<< HEAD
         # convert back to ints safely
+=======
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         years_int = []
         for y in selected_years:
             try:
@@ -128,13 +146,19 @@ def show_recognition_individual_tab():
     # ------------------ AWARD TYPE (OTA REMOVED IN FILTER OPTIONS ONLY) ------------------
     with f2:
         award_titles = temp_df["New_Award_title"].dropna().unique()
+<<<<<<< HEAD
 
         # Remove ANY award containing "ota" (case-insensitive)
+=======
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         award_titles = [
             a for a in award_titles
             if "ota" not in str(a).strip().lower()
         ]
+<<<<<<< HEAD
 
+=======
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         award_options = ["All"] + sorted(award_titles)
 
         selected_awards = st.multiselect(
@@ -188,6 +212,7 @@ def show_recognition_individual_tab():
 
     st.markdown("### 📊 Key Performance Indicators Based Upon Filters")
 
+<<<<<<< HEAD
     # ----------------------------------------------------------
     # 🔥 UPDATED: Exclude OTA Awards only for KPI calculations
     # ----------------------------------------------------------
@@ -208,6 +233,20 @@ def show_recognition_individual_tab():
     employees_with_multiple = int((employee_awards > 1).sum())
     recognition_rate = (employees_with_multiple / total_employees * 100) if total_employees else 0.0
 
+=======
+    kpi_df = filtered_df[
+        ~filtered_df["New_Award_title"].astype(str).str.contains("ota", case=False, na=False)
+    ]
+
+    total_employees = kpi_df["Employee Name"].nunique()
+    total_awards = len(kpi_df)
+    employee_awards = kpi_df.groupby("Employee Name")["New_Award_title"].count()
+
+    top_performer_awards = int(employee_awards.max()) if len(employee_awards) else 0
+    employees_with_multiple = int((employee_awards > 1).sum())
+    recognition_rate = (employees_with_multiple / total_employees * 100) if total_employees else 0.0
+
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     # KPI Layout
     k1, k2, k4, k5 = st.columns(4)
 
@@ -234,8 +273,12 @@ def show_recognition_individual_tab():
         st.markdown(
             f"""
             <div class="metric-card"><h4>
+<<<<<<< HEAD
             <span class="kpi-label">Individual With the Highest Number of Awards
             <span class="kpi-help" title="Highest award count.">?</span></span></h4>
+=======
+            <span class="kpi-label">Highest Number of Awards for an Individual<span class="kpi-help" title="Highest award count.">?</span></span></h4>
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
             <h2>{top_performer_awards}</h2></div>
             """, unsafe_allow_html=True)
 
@@ -247,11 +290,27 @@ def show_recognition_individual_tab():
             <span class="kpi-help" title="% employees with more than 1 award.">?</span></span></h4>
             <h2>{recognition_rate:.1f}%</h2></div>
             """, unsafe_allow_html=True)
+<<<<<<< HEAD
+=======
+
+    # ✅ Add KPI Glossary
+    show_glossary(
+        "Key Performance Indicators",
+        "**Total Employees**: Number of unique individuals in the filtered dataset. "
+        "**Total Awards**: Count of all awards (OTA awards excluded from this metric). "
+        "**Individual With Highest Awards**: The maximum number of awards received by any single employee. "
+        "**Multi-Award Rate**: Percentage of employees who have received more than one award, indicating repeat recognition."
+    )
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
     st.markdown("---")
 
     # ============================================================
+<<<<<<< HEAD
     # CHARTS + TABLES (UNCHANGED — STILL SHOW OTA AWARDS)
+=======
+    # CHARTS + TABLES
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     # ============================================================
 
     st.subheader("🌟 Most Awards Received For Individuals")
@@ -274,18 +333,43 @@ def show_recognition_individual_tab():
         )
         fig1.update_layout(height=600)
         st.plotly_chart(fig1, use_container_width=True)
+        
+        # ✅ Add Glossary
+        show_glossary(
+            "Most Awards Received Sunburst Chart",
+            "This interactive sunburst chart visualizes the top 15 employees by total awards received. "
+            "The **inner ring** represents teams, and the **outer ring** shows individual employees within each team. "
+            "The **size and color intensity** of each segment correspond to the number of awards received. "
+            "Hover over segments to see detailed breakdown. This helps identify star performers across different teams."
+        )
     else:
         st.info("No data available for selected filters.")
 
     st.markdown("---")
 
     st.subheader("📌 Recognition Distribution Histogram")
+<<<<<<< HEAD
     # award_counts_df uses KPI employee_awards (OTA excluded) — if empty, show message
+=======
+    
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     if len(employee_awards):
         award_counts_df = employee_awards.reset_index(name="Awards Count")
         fig3 = px.histogram(award_counts_df, x="Awards Count", nbins=20)
         fig3.update_layout(height=400)
         st.plotly_chart(fig3, use_container_width=True)
+<<<<<<< HEAD
+=======
+        
+        # ✅ Add Glossary
+        show_glossary(
+            "Recognition Distribution Histogram",
+            "This histogram shows the **distribution of award counts** across all employees. "
+            "The **x-axis** represents the number of awards received, and the **y-axis** shows the number of employees in each bracket. "
+            "This helps identify if recognition is evenly distributed or if there are outliers with significantly more awards. "
+            "A right-skewed distribution indicates most employees have few awards, while a few have many."
+        )
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     else:
         st.info("No (non-OTA) award counts available for histogram.")
 
@@ -313,6 +397,18 @@ def show_recognition_individual_tab():
             )
             fig4.update_layout(height=600)
             st.plotly_chart(fig4, use_container_width=True)
+<<<<<<< HEAD
+=======
+            
+            # ✅ Add Glossary
+            show_glossary(
+                "Award Types by Top Performers Treemap",
+                "This treemap visualizes the **breakdown of award types** for the top 10 performers. "
+                "The **first level** shows employee names, and the **second level** shows the types of awards they received. "
+                "The **size of each block** represents the count of that award type, and **darker blue colors** indicate higher counts. "
+                "This helps understand which types of awards (Team, Spot, Champion, Awesome) are most commonly given to top performers."
+            )
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         else:
             st.info("No award data available for top performers.")
     else:
@@ -336,6 +432,18 @@ def show_recognition_individual_tab():
             use_container_width=True,
             height=400
         )
+<<<<<<< HEAD
+=======
+        
+        # ✅ Add Glossary
+        show_glossary(
+            "Top 20 Recipients Detailed Table",
+            "This table lists the **top 20 employees** by total award count, along with their team and a sample of award types received. "
+            "The **color gradient** (yellow to red) highlights employees with higher award counts. "
+            "**Award Types (Sample)** shows up to 3 unique award types the employee has received. "
+            "Use this table to identify consistently high-performing individuals and their recognition patterns."
+        )
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     else:
         st.info("No award records to show top recipients.")
 
@@ -359,10 +467,27 @@ def show_recognition_individual_tab():
                 height=400,
             )
             st.info(f"{len(low_rec)} employees have low recognition (≤ 2 awards).")
+<<<<<<< HEAD
+=======
+            
+            # ✅ Add Glossary
+            show_glossary(
+                "Recognition Gap Analysis",
+                "This table identifies employees with **low recognition levels** (2 or fewer awards). "
+                "The **color gradient** (red to green) helps visualize recognition levels, with red indicating very low counts. "
+                "Use this analysis to identify potential gaps in your recognition program and ensure all team members are appropriately acknowledged. "
+                "Consider whether these employees deserve more recognition or if there are barriers preventing their nominations."
+            )
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         else:
             st.success("All employees received 3+ awards!")
     else:
         st.info("No filtered employee award data to analyze gaps.")
+<<<<<<< HEAD
+=======
+
+    st.markdown("---")
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
     st.subheader("📉 Team-Level Recognition Gaps")
 
@@ -373,11 +498,17 @@ def show_recognition_individual_tab():
     team_gap = pd.merge(team_awards, team_size, on="Team name", how="outer")
     team_gap.columns = ["Team", "Total Awards", "Total Employees"]
 
+<<<<<<< HEAD
     # Ensure numeric, replace zeros where appropriate and avoid dividing by zero
     team_gap["Total Awards"] = pd.to_numeric(team_gap["Total Awards"].fillna(0), errors="coerce").fillna(0)
     team_gap["Total Employees"] = pd.to_numeric(team_gap["Total Employees"].fillna(0), errors="coerce").fillna(0)
 
     # Vectorized safe division: when employees == 0, result will be np.nan -> fill with 0
+=======
+    team_gap["Total Awards"] = pd.to_numeric(team_gap["Total Awards"].fillna(0), errors="coerce").fillna(0)
+    team_gap["Total Employees"] = pd.to_numeric(team_gap["Total Employees"].fillna(0), errors="coerce").fillna(0)
+
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     team_gap["Awards per Employee"] = team_gap["Total Awards"] / team_gap["Total Employees"].replace({0: np.nan})
     team_gap["Awards per Employee"] = team_gap["Awards per Employee"].fillna(0.0)
 
@@ -388,6 +519,7 @@ def show_recognition_individual_tab():
         else ("Moderate" if x < overall_avg else "Good")
     )
 
+<<<<<<< HEAD
     # ---------------- SAFE SLIDER: filter teams by Awards per Employee --------------
     # Streamlit slider requires min < max. We'll compute min/max and guard if equal.
     min_val = float(team_gap["Awards per Employee"].min()) if len(team_gap) else 0.0
@@ -398,6 +530,14 @@ def show_recognition_individual_tab():
         max_val = min_val + max(0.01, abs(min_val) * 0.01)
 
     # Offer the slider (float) with small step
+=======
+    min_val = float(team_gap["Awards per Employee"].min()) if len(team_gap) else 0.0
+    max_val = float(team_gap["Awards per Employee"].max()) if len(team_gap) else 1.0
+
+    if np.isclose(min_val, max_val):
+        max_val = min_val + max(0.01, abs(min_val) * 0.01)
+
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     threshold = st.slider(
         "Minimum Awards per Employee to display teams",
         min_value=min_val,
@@ -406,6 +546,7 @@ def show_recognition_individual_tab():
         step=(max_val - min_val) / 100 if (max_val - min_val) > 0 else 0.01,
         format="%.2f",
         key="team_threshold_slider"
+<<<<<<< HEAD
     )
 
     display_team_gap = team_gap[team_gap["Awards per Employee"] >= threshold].sort_values(
@@ -418,9 +559,30 @@ def show_recognition_individual_tab():
     )
 
     st.markdown("---")
+=======
+    )
 
-    st.subheader("🚫 Employees With Zero Awards")
+    display_team_gap = team_gap[team_gap["Awards per Employee"] >= threshold].sort_values(
+        "Awards per Employee", ascending=False
+    )
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
+    st.dataframe(
+        display_team_gap.style.background_gradient(subset=["Awards per Employee"], cmap="YlOrRd"),
+        use_container_width=True
+    )
+    
+    # ✅ Add Glossary
+    show_glossary(
+        "Team-Level Recognition Gaps",
+        "This table analyzes **awards per employee** at the team level to identify potential recognition gaps. "
+        "**Awards per Employee** is calculated by dividing total team awards by the number of team members. "
+        "**Gap Flag** categorizes teams as 'Low' (below 50% of average), 'Moderate' (below average), or 'Good' (above average). "
+        "Use the **slider above** to filter teams by minimum awards per employee threshold. "
+        "Teams with low ratios may need attention to ensure equitable recognition across the organization."
+    )
+
+<<<<<<< HEAD
     # The original code attempted to find zero-award employees by comparing all_employees vs awarded_employees
     # but both were sourced from the same df with awards, so that results in an empty set.
     # We'll only compute zero-awards if the sheet provides a full employee roster (column name 'All Employees' or 'Employee Roster')
@@ -454,3 +616,10 @@ def show_recognition_individual_tab():
         else:
             # Already displayed info() above explaining absence of roster
             pass
+=======
+    st.markdown("---")
+
+
+if __name__ == "__main__":
+    show_recognition_individual_tab()
+>>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
