@@ -2,11 +2,7 @@ import streamlit as st
 
 def show_suggestions_page():
 
-<<<<<<< HEAD
-    st.markdown("### 🔍 Findings & Insights")
-=======
     st.markdown("### Findings & Recommendations")
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     st.write("")  # spacing
 
     # ---------- CLEAN CARD STYLE ----------
@@ -26,48 +22,6 @@ def show_suggestions_page():
         </div>
     """
 
-<<<<<<< HEAD
-    # ---------- CONTENT WITHOUT ANY HTML TAGS ----------
-    spot_text = """
-    In the earlier system, Spot Awards were highlighted in Kudu’s Corner, creating a strong emotional connection.
-
-    In the new all-hands format, all recognitions are merged into a single placard, reducing visibility.
-
-    Employees expressed that the emotional impact of Kudu’s Corner is missing.
-
-    A dedicated section to highlight Spot Awards can help restore the impact.
-    """
-
-    awesome_text = """
-    Many employees feel the Awesome Award lacks meaningful value in its current form.
-
-    Suggestion: Rename it to something more meaningful, such as “Appreciation Award”.
-
-    If keeping the name, apply stricter eligibility criteria so the award feels more significant.
-    """
-
-    single_award_text = """
-    Data indicates some employees received only one award despite being part of larger teams.
-
-    These individuals may be under-recognized in group-heavy award distributions.
-
-    Recommendation: Highlight such contributors separately to ensure they receive the visibility they deserve.
-    """
-
-    # ---------- CONVERT NEWLINES TO <br> ----------
-    spot_html = spot_text.replace("\n", "<br>")
-    awesome_html = awesome_text.replace("\n", "<br>")
-    single_html = single_award_text.replace("\n", "<br>")
-
-    # ---------- DISPLAY CLEAN CARDS ----------
-    st.markdown(card_style.format(
-        title="1. Restore the Emotional Impact of Spot Awards",
-        content=spot_html
-    ), unsafe_allow_html=True)
-
-    st.markdown(card_style.format(
-        title="2. Improve the Value of the Awesome Award",
-=======
     # ---------- TEXT BLOCKS (PLAIN, THEN CONVERT TO <br>) ----------
 
     # 1) Awesome Award – rename, criteria, open issues
@@ -120,14 +74,10 @@ def show_suggestions_page():
     # ---------- DISPLAY CARDS ----------
     st.markdown(card_style.format(
         title="1. Strengthen and Rename the Awesome Award",
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         content=awesome_html
     ), unsafe_allow_html=True)
 
     st.markdown(card_style.format(
-<<<<<<< HEAD
-        title="3. Improve Visibility for Single-Award Contributors",
-=======
         title="2. Restore the Impact and Visibility of Spot Awards",
         content=spot_html
     ), unsafe_allow_html=True)
@@ -144,6 +94,5 @@ def show_suggestions_page():
 
     st.markdown(card_style.format(
         title="5. Support Under-Recognised Contributors",
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         content=single_html
     ), unsafe_allow_html=True)

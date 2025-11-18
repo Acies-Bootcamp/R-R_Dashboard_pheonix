@@ -22,8 +22,6 @@ ANALYSIS_AWARD_TYPES = [
     "Awesome Award",
 ]
 
-<<<<<<< HEAD
-=======
 # ===================== TEAM NORMALIZATION =====================
 TEAM_NORMALIZATION = {
     "edgecore": "Edgecore",
@@ -35,7 +33,6 @@ TEAM_NORMALIZATION = {
     # add more variants here if you spot any in the raw data
 }
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
 def normalize_name(name):
     if pd.isna(name):
@@ -46,8 +43,6 @@ def normalize_name(name):
     return name
 
 
-<<<<<<< HEAD
-=======
 def canonical_team(name: str) -> str:
     """
     Normalize and map raw team names into canonical labels.
@@ -92,15 +87,10 @@ def is_unknown_team(name) -> bool:
     return False
 
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 def map_sankey_bucket(title: str) -> str | None:
     if not isinstance(title, str):
         return None
     t = title.lower().strip()
-<<<<<<< HEAD
-=======
-
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     if "team" in t and "spot" not in t and "ota" not in t and "occasion" not in t:
         return "Team Award"
     if "spot" in t:
@@ -117,16 +107,9 @@ def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{sheet_key}/export?format=csv"
     df = pd.read_csv(url)
 
-<<<<<<< HEAD
-    # Normalize Month & Year and create Date
-    df["Month"] = df.get("Month", "").astype(str).str.strip().str.capitalize()
-    # Convert year to numeric; store as nullable Int64
-    df["year"] = pd.to_numeric(df.get("year", None), errors="coerce").astype("Int64")
-=======
     df["Month"] = df["Month"].astype(str).str.strip().str.capitalize()
     df["year"] = pd.to_numeric(df["year"], errors="coerce")
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     month_map = {
         "January": 1,
         "February": 2,
@@ -148,20 +131,10 @@ def load_data():
         errors="coerce",
     )
 
-<<<<<<< HEAD
-    # Clean award/title/team strings consistently
-    df["New_Award_title"] = df.get("New_Award_title", "").astype(str).str.title().str.strip()
-    df["Team name"] = df.get("Team name", "").astype(str).str.title().str.strip()
-    df["Award Title"] = df.get("Award Title", "").astype(str).str.strip()
-    df["Nominated In"] = df.get("Nominated In", "").astype(str).str.strip()
-    df["Department"] = df.get("Department", "").astype(str).str.strip()
-    df["Seating Location"] = df.get("Seating Location", "").astype(str).str.strip()
-=======
     df["New_Award_title"] = df["New_Award_title"].astype(str).str.title().str.strip()
 
     # canonicalise team names
     df["Team name"] = df["Team name"].astype(str).apply(canonical_team)
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
     return df
 
@@ -187,18 +160,10 @@ def show_award_analysis():
                 index=0,
             )
 
-<<<<<<< HEAD
-        # Year selector (fixed and robust)
-        with col2:
-            # get numeric years as plain ints (dropna)
-            years = sorted(df["year"].dropna().astype(int).unique().tolist())
-            year_options = ["All"] + years
-=======
         # Year selector
         with col2:
             years = sorted(df["year"].dropna().astype(int).unique())
             year_options = ["All"] + list(years)
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
             selected_years_raw = st.multiselect(
                 "Select Year(s)",
@@ -206,23 +171,11 @@ def show_award_analysis():
                 default=["All"],
             )
 
-<<<<<<< HEAD
-            # Normalized selected_years as list[int]
-            if "All" in selected_years_raw or not selected_years_raw:
-                selected_years = years[:]  # all numeric years
-            else:
-                # Convert any numeric-like picks to ints (ignore anything else)
-                # Selected items will be ints because options included ints
-                selected_years = [int(y) for y in selected_years_raw if isinstance(y, (int, float,))]
-
-        # Award type selector
-=======
             if "All" in selected_years_raw or not selected_years_raw:
                 selected_years = list(years)
             else:
                 selected_years = [int(y) for y in selected_years_raw if y != "All"]
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         with col3:
             award_type_options = ["All"] + ANALYSIS_AWARD_TYPES
             selected_award_types_raw = st.multiselect(
@@ -233,15 +186,8 @@ def show_award_analysis():
             if "All" in selected_award_types_raw or not selected_award_types_raw:
                 award_types = ANALYSIS_AWARD_TYPES[:]
             else:
-<<<<<<< HEAD
-                # Keep values as-is (strings)
-                award_types = [a for a in selected_award_types_raw if isinstance(a, str)]
-
-        # Recognition systems
-=======
                 award_types = selected_award_types_raw
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         with col4:
             recognition_systems = sorted([s for s in df["Nominated In"].dropna().unique().tolist() if str(s).strip() != ""])
             rec_options = ["All"] + recognition_systems
@@ -249,10 +195,6 @@ def show_award_analysis():
                 "Recognition System", rec_options, default=["All"]
             )
 
-<<<<<<< HEAD
-        # Departments & Locations (second row)
-=======
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
         col5, col6 = st.columns(2)
         with col5:
             departments = sorted([d for d in df["Department"].dropna().unique().tolist() if str(d).strip() != ""])
@@ -272,35 +214,6 @@ def show_award_analysis():
                 "Filter by Location", loc_options, default=["All"]
             )
 
-<<<<<<< HEAD
-    # Build filtered dataframe safely
-    # Ensure year-based filtering uses numeric year
-    df_filtered = df.copy()
-
-    # Year filter
-    if selected_years:
-        # Ensure we only filter by year if df has year values
-        df_filtered = df_filtered[df_filtered["year"].notna()]
-        df_filtered = df_filtered[df_filtered["year"].astype(int).isin(selected_years)]
-
-    # Award type filter
-    if award_types:
-        df_filtered = df_filtered[df_filtered["New_Award_title"].isin(award_types)]
-
-    # Recognition System filter
-    if selected_sys and "All" not in selected_sys:
-        df_filtered = df_filtered[df_filtered["Nominated In"].isin(selected_sys)]
-
-    # Department filter
-    if selected_dept and "All" not in selected_dept:
-        df_filtered = df_filtered[df_filtered["Department"].isin(selected_dept)]
-
-    # Location filter
-    if selected_loc and "All" not in selected_loc:
-        df_filtered = df_filtered[df_filtered["Seating Location"].isin(selected_loc)]
-
-    # Period column creation depending on period selection
-=======
     # ========= APPLY FILTERS =========
     df_filtered = df[
         (df["year"].isin(selected_years))
@@ -316,7 +229,6 @@ def show_award_analysis():
     if "All" not in selected_loc:
         df_filtered = df_filtered[df_filtered["Seating Location"].isin(selected_loc)]
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     if period == "Monthly":
         df_filtered["Period"] = df_filtered["Date"].dt.to_period("M").dt.to_timestamp()
     elif period == "Quarterly":
@@ -330,19 +242,12 @@ def show_award_analysis():
         st.info("No data available for the current filters.")
         return
 
-<<<<<<< HEAD
-    # KPIs
-=======
     # ========= KPIs =========
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     total_awards = len(df_filtered)
     old_title_count = df[df["Nominated In"].str.lower() == "all-hands"]["Award Title"].nunique()
     new_title_count = len(ANALYSIS_AWARD_TYPES)
 
-<<<<<<< HEAD
-=======
     # Top team (exclude unknowns)
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     team_awards_only = df_filtered[
         (df_filtered["New_Award_title"] == "Team Award")
         & (~df_filtered["Team name"].apply(is_unknown_team))
@@ -422,32 +327,13 @@ def show_award_analysis():
 
     st.divider()
 
-<<<<<<< HEAD
-    # Sankey mapping visualization
-=======
     # ========= SANKEY =========
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     st.markdown(
         "<p class='section-title'>Award Title Mapping (Sankey)</p>",
         unsafe_allow_html=True,
     )
 
     df_for_sankey = df.copy()
-<<<<<<< HEAD
-    # Apply similar filter criteria to Sankey except award mapping is from raw Award Title -> Sankey_Target
-    # Year filter for sankey
-    if selected_years:
-        df_for_sankey = df_for_sankey[df_for_sankey["year"].notna()]
-        df_for_sankey = df_for_sankey[df_for_sankey["year"].astype(int).isin(selected_years)]
-    if selected_sys and "All" not in selected_sys:
-        df_for_sankey = df_for_sankey[df_for_sankey["Nominated In"].isin(selected_sys)]
-    if selected_dept and "All" not in selected_dept:
-        df_for_sankey = df_for_sankey[df_for_sankey["Department"].isin(selected_dept)]
-    if selected_loc and "All" not in selected_loc:
-        df_for_sankey = df_for_sankey[df_for_sankey["Seating Location"].isin(selected_loc)]
-
-    df_for_sankey["Sankey_Target"] = df_for_sankey["New_Award_title"].apply(map_sankey_bucket)
-=======
     df_for_sankey = df_for_sankey[df_for_sankey["year"].isin(selected_years)]
 
     if "All" not in selected_sys:
@@ -466,19 +352,15 @@ def show_award_analysis():
     df_for_sankey["Sankey_Target"] = df_for_sankey["New_Award_title"].apply(
         map_sankey_bucket
     )
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     df_for_sankey = df_for_sankey.dropna(subset=["Sankey_Target"])
 
     sankey_targets = sorted(df_for_sankey["Sankey_Target"].unique())
 
-<<<<<<< HEAD
-=======
     def clean_team_list(series):
         unique = {t.strip() for t in series.astype(str)}
         unique = {t for t in unique if not is_unknown_team(t)}
         return ", ".join(sorted(unique)) if unique else "No team info"
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     if not sankey_targets:
         st.info("No Sankey targets (Team / Spot / OTA) in current filters.")
     else:
@@ -497,8 +379,6 @@ def show_award_analysis():
                     .reset_index(name="Count")
                 )
 
-<<<<<<< HEAD
-=======
                 team_names_by_title = (
                     sankey_df.dropna(subset=["Award Title", "Team name"])
                     .groupby("Award Title")["Team name"]
@@ -506,17 +386,10 @@ def show_award_analysis():
                     .to_dict()
                 )
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
                 raw_titles = sankey_group["Award Title"].astype(str).unique().tolist()
                 labels = raw_titles + [target_award]
                 label_to_idx = {lbl: i for i, lbl in enumerate(labels)}
 
-<<<<<<< HEAD
-                sources = [label_to_idx[row["Award Title"]] for _, row in sankey_group.iterrows()]
-                targets = [label_to_idx[target_award] for _ in sankey_group.itertuples()]
-                values = sankey_group["Count"].tolist()
-
-=======
                 sources = [
                     label_to_idx[row["Award Title"]]
                     for _, row in sankey_group.iterrows()
@@ -531,7 +404,6 @@ def show_award_analysis():
                     for _, row in sankey_group.iterrows()
                 ]
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
                 link_color = AWARD_COLORS.get(target_award, "#A7C7E7")
 
                 fig_sankey = go.Figure(
@@ -567,11 +439,7 @@ def show_award_analysis():
 
     st.divider()
 
-<<<<<<< HEAD
-    # Most frequently given awards (bar)
-=======
     # ========= MOST FREQUENT AWARDS =========
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     st.markdown(
         "<p class='section-title'>Most Frequently Given Awards</p>",
         unsafe_allow_html=True,
@@ -593,11 +461,7 @@ def show_award_analysis():
     fig1.update_layout(template="plotly_white", height=500)
     st.plotly_chart(fig1, use_container_width=True)
 
-<<<<<<< HEAD
-    # Team-wise treemap
-=======
     # ========= TEAM TREEMAP =========
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     st.markdown(
         "<p class='section-title'>Team-Wise Award Distribution (Treemap)</p>",
         unsafe_allow_html=True,
@@ -608,11 +472,7 @@ def show_award_analysis():
         .size()
         .reset_index(name="Award Count")
     )
-<<<<<<< HEAD
-    team_awards = team_awards[~team_awards["Team name"].isin(["", "Nan", "-", None])]
-=======
     team_awards = team_awards[~team_awards["Team name"].apply(is_unknown_team)]
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
     if not team_awards.empty:
         fig2 = px.treemap(
@@ -628,21 +488,14 @@ def show_award_analysis():
     else:
         st.info("Not enough data for the treemap with current filters.")
 
-<<<<<<< HEAD
-    # Leaderboard
-=======
     # ========= TOP TEAMS LEADERBOARD =========
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     st.markdown(
         "<p class='section-title'>Top Award-Winning Teams</p>",
         unsafe_allow_html=True,
     )
 
-<<<<<<< HEAD
-=======
     df_leader = df_filtered[~df_filtered["Team name"].apply(is_unknown_team)].copy()
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     leaderboard = (
         df_leader.groupby("Team name")
         .agg(
@@ -652,8 +505,6 @@ def show_award_analysis():
         .reset_index()
     )
 
-<<<<<<< HEAD
-=======
     leaderboard["Recognition_Score"] = (
         (leaderboard["People_Count"] * 0.6)
         + (leaderboard["Award_Count"] * 0.4)
@@ -663,7 +514,6 @@ def show_award_analysis():
         by="Recognition_Score", ascending=False
     ).head(10)
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     if not leaderboard.empty:
         fig3 = px.bar(
             leaderboard,
@@ -704,11 +554,7 @@ def show_award_analysis():
     else:
         st.info("No team data available for the current filters.")
 
-<<<<<<< HEAD
-    # Timeline
-=======
     # ========= AWARD GROWTH OVER TIME =========
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     st.markdown(
         "<p class='section-title'>Award Growth Over Time</p>",
         unsafe_allow_html=True,

@@ -7,10 +7,7 @@ from reco_individual import show_recognition_individual_tab
 from award_analysis import show_award_analysis
 from coupoun_estimation import show_coupon_estimation
 from suggestions import show_suggestions_page
-<<<<<<< HEAD
-=======
 # from summary import show_summary  # optional
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
 # ------------------------------------------------------
 # PAGE CONFIG
@@ -171,13 +168,8 @@ elif section == "Award Analysis":
 elif section == "Coupon Estimation":
     show_coupon_estimation()
 
-<<<<<<< HEAD
-elif section == "Findings/Insights":
-    show_suggestions_page()   # ✅ Updated
-=======
 elif section == "Recommendations":
     show_suggestions_page()
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
 # ------------------------------------------------------
 # AUTO SCROLL TO TOP on every navigation

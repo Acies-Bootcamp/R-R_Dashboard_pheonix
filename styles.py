@@ -1,65 +1,32 @@
 """
 Centralised styling for the R&R dashboard.
 
-<<<<<<< HEAD
-This module defines styling functions and utilities including CSS injection
-and Excel export capabilities. By consolidating fonts, colours, component
-styling and export functions into one place, we ensure a uniform look and
-feel across all pages.
-=======
 This module defines a single function, `apply_styles()`, which injects
 consistent CSS into the Streamlit app.  By consolidating fonts,
 colours and component styling into one place, we ensure a uniform
 look and feel across all pages.
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
 Usage:
 
 ```python
 import styles
 styles.apply_styles()
-<<<<<<< HEAD
-
-# For Excel export
-excel_file = styles.create_excel_download(df, "report.xlsx")
-st.download_button(
-    label="📊 Download Excel",
-    data=excel_file,
-    file_name="report.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-=======
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 ```
 
 This should be called at the top of each page or main function before
 rendering any UI elements.
 """
 import streamlit as st
-<<<<<<< HEAD
-import pandas as pd
-from io import BytesIO
-from typing import Dict, Optional
-
-
-def apply_styles(theme: str = "blue"):
-=======
 
 def apply_styles(theme: str = "White"):
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     """Inject global CSS for the dashboard with a selectable colour theme.
 
     Parameters
     ----------
     theme : str, optional
         Name of the colour theme to use.  Supported values are
-<<<<<<< HEAD
-        "blue", "yellow", and "white" (case‑insensitive).  The
-        default is "blue".
-=======
         "White", "yellow", and "white" (case‑insensitive).  The
         default is "White".
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
     This function generates CSS rules on the fly based on the chosen
     theme.  It also updates Plotly's default colour palette for
@@ -69,17 +36,10 @@ def apply_styles(theme: str = "White"):
     start of every page after any theme selection is made.
     """
     import plotly.express as px
-<<<<<<< HEAD
-    theme_key = theme.lower() if theme else "blue"
-    # Define colour palettes for supported themes
-    THEME_DEFINITIONS = {
-        "blue": {
-=======
     theme_key = theme.lower() if theme else "White"
     # Define colour palettes for supported themes
     THEME_DEFINITIONS = {
         "White": {
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
             "gradient": ["#0D3C66", "#0979B7", "#4FC5FA"],
             "accent_dark": "#0D3C66",
             "accent_base": "#0979B7",
@@ -107,11 +67,7 @@ def apply_styles(theme: str = "White"):
             "chart_palette": ["#0D3C66", "#0979B7", "#4FC5FA", "#F4C542", "#EF6B3F", "#8BC34A", "#E91E63"]
         }
     }
-<<<<<<< HEAD
-    colours = THEME_DEFINITIONS.get(theme_key, THEME_DEFINITIONS["blue"])
-=======
     colours = THEME_DEFINITIONS.get(theme_key, THEME_DEFINITIONS["White"])
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     # Update Plotly default discrete colour sequence for bright, high‑contrast charts
     px.defaults.color_discrete_sequence = colours["chart_palette"]
     # Build the CSS string with theme variables
@@ -261,32 +217,9 @@ def apply_styles(theme: str = "White"):
         transform: translateY(-2px);
         background-color: {button_hover_bg};
     }}
-<<<<<<< HEAD
-    
-    /* Download button styling */
-    .stDownloadButton > button {{
-        background-color: {colours['accent_base']};
-        color: white;
-        font-weight: 600;
-        border-radius: 8px;
-        padding: 0.5rem 1.5rem;
-        border: none;
-        transition: all 0.2s ease-in-out;
-    }}
-    .stDownloadButton > button:hover {{
-        background-color: {colours['accent_dark']};
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }}
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
-    
-=======
-    </style>
-    """
-    st.markdown(css, unsafe_allow_html=True)
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
 def show_spinner(duration: float = 1.0):
     """
@@ -354,304 +287,4 @@ def show_spinner(duration: float = 1.0):
     # Keep spinner on screen for the specified duration
     time.sleep(max(duration, 0.1))
     # Clear the spinner
-<<<<<<< HEAD
     placeholder.empty()
-
-
-# ============================================================================
-# EXCEL EXPORT FUNCTIONS
-# ============================================================================
-
-def create_excel_download(
-    dataframe: pd.DataFrame,
-    filename: str = "data_export.xlsx",
-    sheet_name: str = "Data"
-) -> BytesIO:
-    """
-    Create an Excel file from a DataFrame for download.
-    
-    This function converts a pandas DataFrame into an Excel (.xlsx) file
-    stored in memory, ready to be used with Streamlit's download_button.
-    The Excel file is created using openpyxl engine for maximum compatibility.
-    
-    Parameters
-    ----------
-    dataframe : pd.DataFrame
-        The data to export to Excel format
-    filename : str, optional
-        Name of the downloaded file (default: "data_export.xlsx")
-    sheet_name : str, optional
-        Name of the Excel sheet (default: "Data")
-        
-    Returns
-    -------
-    BytesIO
-        Excel file buffer ready for st.download_button
-        
-    Example
-    -------
-    >>> excel_file = create_excel_download(df, "sales_report.xlsx", "Q1 Sales")
-    >>> st.download_button(
-    ...     label="📥 Download Excel",
-    ...     data=excel_file,
-    ...     file_name="sales_report.xlsx",
-    ...     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ... )
-    """
-    output = BytesIO()
-    try:
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
-        output.seek(0)
-        return output
-    except Exception as e:
-        st.error(f"Error creating Excel file: {str(e)}")
-        return BytesIO()
-
-
-def create_multi_sheet_excel(
-    data_dict: Dict[str, pd.DataFrame],
-    filename: str = "report.xlsx"
-) -> BytesIO:
-    """
-    Export multiple DataFrames to different sheets in one Excel file.
-    
-    This function is useful for creating comprehensive reports where
-    different data categories are organized into separate sheets within
-    a single Excel workbook.
-    
-    Parameters
-    ----------
-    data_dict : dict
-        Dictionary with {sheet_name: dataframe} pairs. Each key becomes
-        a sheet name and its value is the DataFrame for that sheet.
-    filename : str, optional
-        Name of the downloaded file (default: "report.xlsx")
-        
-    Returns
-    -------
-    BytesIO
-        Excel file buffer with multiple sheets ready for download
-        
-    Example
-    -------
-    >>> data = {
-    ...     "Sales": sales_df,
-    ...     "Inventory": inventory_df,
-    ...     "Customers": customers_df
-    ... }
-    >>> excel_file = create_multi_sheet_excel(data, "monthly_report.xlsx")
-    >>> st.download_button(
-    ...     label="📊 Download Full Report",
-    ...     data=excel_file,
-    ...     file_name="monthly_report.xlsx",
-    ...     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ... )
-    """
-    output = BytesIO()
-    try:
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            for sheet_name, df in data_dict.items():
-                # Clean sheet name (Excel has 31 char limit and some forbidden chars)
-                clean_name = sheet_name[:31].replace('/', '-').replace('\\', '-')
-                df.to_excel(writer, sheet_name=clean_name, index=False)
-        output.seek(0)
-        return output
-    except Exception as e:
-        st.error(f"Error creating multi-sheet Excel file: {str(e)}")
-        return BytesIO()
-
-
-def create_styled_excel(
-    dataframe: pd.DataFrame,
-    filename: str = "styled_export.xlsx",
-    sheet_name: str = "Data",
-    header_color: str = "0979B7",
-    theme: str = "blue"
-) -> BytesIO:
-    """
-    Create a professionally styled Excel file with formatted headers.
-    
-    This function creates an Excel file with styled headers matching your
-    dashboard theme, including colored backgrounds, bold white text, and
-    centered alignment. This makes the exported data look professional
-    and consistent with your dashboard design.
-    
-    Parameters
-    ----------
-    dataframe : pd.DataFrame
-        The data to export
-    filename : str, optional
-        Name of the downloaded file (default: "styled_export.xlsx")
-    sheet_name : str, optional
-        Name of the Excel sheet (default: "Data")
-    header_color : str, optional
-        Hex color for header background without # (default: "0979B7")
-    theme : str, optional
-        Theme name to match dashboard colors (default: "blue")
-        
-    Returns
-    -------
-    BytesIO
-        Styled Excel file buffer ready for download
-        
-    Example
-    -------
-    >>> excel_file = create_styled_excel(
-    ...     df, 
-    ...     "styled_report.xlsx",
-    ...     "Q4 Results",
-    ...     theme="blue"
-    ... )
-    >>> st.download_button(
-    ...     label="📥 Download Styled Report",
-    ...     data=excel_file,
-    ...     file_name="styled_report.xlsx",
-    ...     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ... )
-    """
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    
-    # Theme-based header colors
-    THEME_COLORS = {
-        "blue": "0979B7",
-        "yellow": "D97D20",
-        "white": "555555"
-    }
-    
-    theme_key = theme.lower()
-    header_bg_color = THEME_COLORS.get(theme_key, "0979B7")
-    
-    output = BytesIO()
-    try:
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            dataframe.to_excel(writer, sheet_name=sheet_name, index=False)
-            worksheet = writer.sheets[sheet_name]
-            
-            # Style headers
-            header_fill = PatternFill(
-                start_color=header_bg_color,
-                end_color=header_bg_color,
-                fill_type="solid"
-            )
-            header_font = Font(color="FFFFFF", bold=True, size=11)
-            header_alignment = Alignment(horizontal='center', vertical='center')
-            
-            # Apply header styling
-            for cell in worksheet[1]:
-                cell.fill = header_fill
-                cell.font = header_font
-                cell.alignment = header_alignment
-            
-            # Auto-adjust column widths
-            for column in worksheet.columns:
-                max_length = 0
-                column_letter = column[0].column_letter
-                for cell in column:
-                    try:
-                        if len(str(cell.value)) > max_length:
-                            max_length = len(str(cell.value))
-                    except:
-                        pass
-                adjusted_width = min(max_length + 2, 50)
-                worksheet.column_dimensions[column_letter].width = adjusted_width
-            
-            # Add borders to all cells
-            thin_border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin')
-            )
-            
-            for row in worksheet.iter_rows(
-                min_row=1,
-                max_row=worksheet.max_row,
-                min_col=1,
-                max_col=worksheet.max_column
-            ):
-                for cell in row:
-                    cell.border = thin_border
-                    # Center align data cells
-                    if cell.row > 1:
-                        cell.alignment = Alignment(horizontal='left', vertical='center')
-        
-        output.seek(0)
-        return output
-    except Exception as e:
-        st.error(f"Error creating styled Excel file: {str(e)}")
-        return BytesIO()
-
-
-def create_download_section(
-    dataframe: pd.DataFrame,
-    filename: str = "dashboard_export.xlsx",
-    button_label: str = "📥 Download as Excel",
-    sheet_name: str = "Data",
-    use_styling: bool = True,
-    theme: str = "blue"
-):
-    """
-    Create a ready-to-use download section with a styled button.
-    
-    This is a convenience function that combines Excel creation and
-    download button in one call. It handles all the boilerplate code
-    for you and creates a professionally styled download experience.
-    
-    Parameters
-    ----------
-    dataframe : pd.DataFrame
-        The data to export
-    filename : str, optional
-        Name of the downloaded file (default: "dashboard_export.xlsx")
-    button_label : str, optional
-        Text to display on download button (default: "📥 Download as Excel")
-    sheet_name : str, optional
-        Name of the Excel sheet (default: "Data")
-    use_styling : bool, optional
-        Whether to apply professional styling to Excel (default: True)
-    theme : str, optional
-        Theme for styling (default: "blue")
-        
-    Example
-    -------
-    >>> # Simple usage
-    >>> create_download_section(df, "sales_data.xlsx")
-    >>> 
-    >>> # Custom usage
-    >>> create_download_section(
-    ...     df,
-    ...     filename="Q4_report.xlsx",
-    ...     button_label="📊 Export Q4 Data",
-    ...     sheet_name="Q4 Sales",
-    ...     use_styling=True,
-    ...     theme="yellow"
-    ... )
-    """
-    if use_styling:
-        excel_file = create_styled_excel(
-            dataframe,
-            filename=filename,
-            sheet_name=sheet_name,
-            theme=theme
-        )
-    else:
-        excel_file = create_excel_download(
-            dataframe,
-            filename=filename,
-            sheet_name=sheet_name
-        )
-    
-    if excel_file.getbuffer().nbytes > 0:
-        st.download_button(
-            label=button_label,
-            data=excel_file,
-            file_name=filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
-    else:
-        st.warning("Unable to create Excel file. Please check your data.")
-=======
-    placeholder.empty()
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3

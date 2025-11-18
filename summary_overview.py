@@ -73,18 +73,10 @@ def clean_rephrase(text: str) -> str:
         if any(k in t for k in keys):
             return category
 
-<<<<<<< HEAD
-    # If no mapping found — fallback to original (lightly cleaned)
-    return t.capitalize()
-
-
-
-=======
     # Fallback – lightly cleaned original text
     return t.capitalize()
 
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 # ================= GLASS / MONOCHROME UI CSS =================
 glass_css = """
 <style>
@@ -112,11 +104,7 @@ h1, h2, h3, h4 { color: #222222 !important; }
 /* KPI help */
 .kpi-label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .kpi-help { position: relative; font-size: 0.75rem; color: #6b7280; border-radius: 999px; border: 1px solid #d4d4d8; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; cursor: help; background-color: #f9fafb; }
-<<<<<<< HEAD
-.kpi-help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: 125%; transform: translateX(-50%); background: #111827; color: #f9fafb; padding: 6px 10px; border-radius: 6px; font-size: 0.75rem; line-height: 1.2; white-space: normal; min-width: 180px; max-width: 260px; text-align: left; opacity: 0; pointer-events: none; transition: opacity 0.15s ease-out; z-index: 9999; }
-=======
 .kpi-help::after { content: attr(data-tip); position: absolute; left: 50%; bottom: 125%; transform: translateX(-50%); background: #111827; color: #f9faff; padding: 6px 10px; border-radius: 6px; font-size: 0.75rem; line-height: 1.2; white-space: normal; min-width: 180px; max-width: 260px; text-align: left; opacity: 0; pointer-events: none; transition: opacity 0.15s ease-out; z-index: 9999; }
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 .kpi-help::before { content: ""; position: absolute; left: 50%; bottom: 115%; transform: translateX(-50%); border-width: 5px; border-style: solid; border-color: #111827 transparent transparent transparent; opacity: 0; transition: opacity 0.15s ease-out; }
 .kpi-help:hover::after, .kpi-help:hover::before { opacity: 1; }
 
@@ -204,130 +192,6 @@ def recognition_reach_rate(df: pd.DataFrame):
     has_awards = df[col_aw].apply(lambda x: len(parse_awards(x)) > 0)
     total = len(df)
     return float(has_awards.sum() / total * 100) if total else np.nan
-<<<<<<< HEAD
-
-
-# ================= COLOR HELPERS =================
-def _hex_to_rgb(h: str):
-    h = h.lstrip("#")
-    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-
-
-def _rgb_to_hex(rgb):
-    return "#%02x%02x%02x" % rgb
-
-
-def _make_freq_color_func(freq_dict, colormap_name: str):
-    if colormap_name.lower() == "blues":
-        light_hex, dark_hex = "#bfdbfe", "#1d4ed8"
-    elif colormap_name.lower() == "oranges":
-        light_hex, dark_hex = "#fed7aa", "#c2410c"
-    elif colormap_name.lower() == "spectral":
-        light_hex, dark_hex = "#fee2e2", "#b91c1c"
-    else:
-        light_hex, dark_hex = "#e5e7eb", "#4b5563"
-
-    light_rgb = _hex_to_rgb(light_hex)
-    dark_rgb = _hex_to_rgb(dark_hex)
-    max_freq = max(freq_dict.values()) if freq_dict else 1.0
-
-    def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
-        f = freq_dict.get(word, 0.0) / max_freq
-        f = f ** 0.5
-        r = int(light_rgb[0] + (dark_rgb[0] - light_rgb[0]) * f)
-        g = int(light_rgb[1] + (dark_rgb[1] - light_rgb[1]) * f)
-        b = int(light_rgb[2] + (dark_rgb[2] - light_rgb[2]) * f)
-        return _rgb_to_hex((r, g, b))
-
-    return color_func
-
-
-# ================= GEMINI CLUSTERING =================
-def _extract_json_block(text: str) -> str | None:
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    if m:
-        return m.group(0)
-    return None
-
-
-def gemini_cluster_phrases(phrases, section_name: str):
-    freq = Counter(phrases)
-    unique_phrases = list(freq.keys())
-
-    default_mapping = [{"theme": p, "phrases": [p]} for p in unique_phrases]
-
-    if not GEMINI_OK or not unique_phrases:
-        mapping = default_mapping
-    else:
-        try:
-            api_key = os.environ.get("GEMINI_API_KEY")
-            if api_key:
-                genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
-
-            sample_text = "\n".join(f"- {p}" for p in unique_phrases[:120])
-
-            prompt = f"""
-You are analysing employee survey feedback for section: "{section_name}".
-
-Group similar phrases into themes. Respond ONLY with JSON in the form:
-
-{{
-  "clusters": [
-    {{
-      "theme": "short 3-6 word label",
-      "phrases": ["original phrase 1", "original phrase 2", ...]
-    }},
-    ...
-  ]
-}}
-
-Important rules:
-- Use the original phrases EXACTLY in "phrases".
-- Do NOT add any commentary outside the JSON.
-- Do NOT invent new phrases.
-
-Phrases:
-{sample_text}
-"""
-            resp = model.generate_content(prompt)
-            raw = resp.text or ""
-            json_block = _extract_json_block(raw) or raw
-            data = json.loads(json_block)
-            mapping = data.get("clusters", default_mapping) or default_mapping
-        except Exception:
-            mapping = default_mapping
-
-    phrase_to_theme: dict[str, str] = {}
-    theme_freq: Counter[str] = Counter()
-
-    for cl in mapping:
-        theme_raw = cl.get("theme") or ""
-        theme = clean_rephrase(theme_raw)
-        if not theme:
-            continue
-
-        for p in cl.get("phrases", []):
-            p_clean = str(p).strip()
-            if not p_clean:
-                continue
-            if p_clean in freq:
-                # Map original phrase -> cleaned theme
-                phrase_to_theme[p_clean] = theme
-                theme_freq[theme] += freq[p_clean]
-
-    # ensure every phrase has a theme
-    for p, c in freq.items():
-        if p not in phrase_to_theme:
-            theme_clean = clean_rephrase(p)
-            phrase_to_theme[p] = theme_clean
-            theme_freq[theme_clean] += c
-
-    return theme_freq, phrase_to_theme, freq
-
-
-# ================= WORDCLOUD =================
-=======
 
 
 # ================= COLOR HELPERS =================
@@ -449,16 +313,11 @@ Phrases:
 
 
 # ================= WORDCLOUD (WITH FUNCTIONAL IMPROVEMENTS VIEW) =================
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool = False):
     if not _WORDCLOUD_OK:
         st.info("WordCloud not available.")
         return
 
-<<<<<<< HEAD
-    # Ensure texts are strings and strip
-=======
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     texts = [clean_text(t) for t in texts if clean_text(t)]
     if not texts:
         st.info(f"No data for {title}")
@@ -488,25 +347,6 @@ def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool =
         # Cluster phrases into themes (Gemini if available)
         theme_freq, phrase_to_theme, raw_freq = gemini_cluster_phrases(parts, section_name)
 
-<<<<<<< HEAD
-        # Store mapping for Excel download — ONLY for Improvement Suggestions
-        if section_name == "Improvement Suggestions":
-            rows = []
-            for phrase, count in raw_freq.items():
-                theme_raw = phrase_to_theme.get(phrase, phrase)
-                rows.append(
-                    {
-                        "Section": section_name,
-                        "Original Phrase": phrase,  # keep original untouched
-                        "Count": count,
-                        "Theme (Cleaned)": clean_rephrase(theme_raw),
-                    }
-                )
-
-            df_map = pd.DataFrame(rows)
-            maps = st.session_state.setdefault("phrase_maps", [])
-            maps.append(df_map)
-=======
         # ===== Store mapping for Excel + interactive explorer (Improvements only) =====
         if section_name == "Improvement Suggestions":
             rows = []
@@ -539,7 +379,6 @@ def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool =
 
             # save for interactive theme explorer
             st.session_state["improvement_themes"] = theme_to_phrases
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
         wc = WordCloud(
             width=1400,
@@ -622,14 +461,9 @@ def clean_list(values):
 
 # ================= MAIN DASHBOARD =================
 def show_rr_dashboard():
-<<<<<<< HEAD
-    # reset phrase maps each run
-    st.session_state["phrase_maps"] = []
-=======
     # reset phrase maps + interactive data each run
     st.session_state["phrase_maps"] = []
     st.session_state["improvement_themes"] = {}
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
 
     # Apply global styles using the selected theme
     theme = st.session_state.get("theme", "Blue")
@@ -740,58 +574,6 @@ def show_rr_dashboard():
         "Happiness metrics are on a 0–100 scale (/100). "
         "'Current System Effectiveness (%)' shows how much the current system improves or drops "
         "vs the earlier one."
-<<<<<<< HEAD
-    )
-
-    st.divider()
-
-    # Engagement preference
-    st.markdown("<p class='section-title'>👀 Which version feels more engaging?</p>", unsafe_allow_html=True)
-
-    map_eng = {
-        "Earlier system (Town Hall via Google Meet)": "Earlier",
-        "Current system (Kudos Bot in Chat)": "Current",
-        "Both equally engaging": "Both",
-    }
-
-    mapped = survey_participants[COLS["engaging"]].map(
-        lambda x: map_eng.get(str(x).strip(), "Other") if not pd.isna(x) else "Other"
-    )
-
-    label_map = {
-        "Earlier": "All Hands (via G Meet)",
-        "Current": "Kudos Corner (Kudos Bot)",
-    }
-
-    df_eng = pd.DataFrame({
-        "Engaging": [
-            label_map["Earlier"],
-            label_map["Current"],
-        ],
-        "Count": [
-            (mapped == "Earlier").sum(),
-            (mapped == "Current").sum(),
-        ],
-    })
-
-    fig_eng = px.pie(
-        df_eng,
-        names="Engaging",
-        values="Count",
-        title="All Hands vs Kudos Corner — Engagement Preference",
-        color="Engaging",
-        color_discrete_map={
-            label_map["Earlier"]: "#2563EB",
-            label_map["Current"]: "#EC4899",
-        },
-    )
-    st.plotly_chart(fig_eng, use_container_width=True)
-
-    st.info(f"⭐ **Both equally engaging**: { (mapped == 'Both').sum() } respondents")
-
-    st.divider()
-
-=======
     )
 
     st.divider()
@@ -801,7 +583,6 @@ def show_rr_dashboard():
     #  interactive theme explorer, Excel download, etc.)
     # ...
 
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     # Awards (survey-based)
     st.markdown("<p class='section-title'>🏅 Who is getting recognised?</p>", unsafe_allow_html=True)
 
@@ -900,9 +681,6 @@ def show_rr_dashboard():
         "Each word in the cloud is a theme label; size and colour reflect how many responses map to that theme."
     )
 
-<<<<<<< HEAD
-    # ================= EXCEL DOWNLOAD =================
-=======
 
     # ================= EXCEL DOWNLOAD + THEME EXPLORER =================
     themes_data = st.session_state.get("improvement_themes") or {}
@@ -926,17 +704,12 @@ def show_rr_dashboard():
                 st.markdown("---")
 
     # 🔹 Download button directly BELOW the expander
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
     if st.session_state.get("phrase_maps"):
         all_maps = pd.concat(st.session_state["phrase_maps"], ignore_index=True)
 
         output = BytesIO()
         with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
             for section, df_sec in all_maps.groupby("Section"):
-<<<<<<< HEAD
-                # Excel sheet names: max 31 chars, no special symbols
-=======
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
                 sheet_name = re.sub(r"[^\w]", "_", section)[:31] or "Sheet1"
                 df_sec.to_excel(writer, index=False, sheet_name=sheet_name)
         output.seek(0)
@@ -944,11 +717,7 @@ def show_rr_dashboard():
         st.download_button(
             "⬇️ Download phrase → theme mapping (Excel)",
             data=output,
-<<<<<<< HEAD
-            file_name="rr_phrase_themes.xlsx",
-=======
             file_name="mapping_Gemini.xlsx",
->>>>>>> 16da823da55549cc448a5ce4535cda6b94d321d3
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
