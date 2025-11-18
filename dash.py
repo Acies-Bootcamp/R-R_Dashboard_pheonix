@@ -5,7 +5,7 @@ from reco_team import show_recognition_team_tab
 from reco_individual import show_recognition_individual_tab
 from award_analysis import show_award_analysis
 from coupoun_estimation import show_coupon_estimation
-# from summary import show_summary  # optional
+from suggestions import show_suggestions_page
 
 # ------------------------------------------------------
 # PAGE CONFIG
@@ -104,7 +104,7 @@ elif section == "Coupon Estimation":
     show_coupon_estimation()
 
 elif section == "Findings/Insights":
-    st.info("Add final insights, interpretations, or visual summaries here.")
+    show_suggestions_page()   # ✅ Updated
 
 # ------------------------------------------------------
 # AUTO SCROLL TO TOP on every navigation

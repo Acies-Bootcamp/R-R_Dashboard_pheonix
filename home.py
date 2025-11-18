@@ -69,7 +69,7 @@ def show_navbar():
     nav_button(nav_cols[2], "🏅 Recognition", "nav_recognition", "Recognition")
     nav_button(nav_cols[3], "🏆 Award Analysis", "nav_award", "Award Analysis")
     nav_button(nav_cols[4], "📈 Coupon Estimation", "nav_coupon", "Coupon Estimation")
-    nav_button(nav_cols[5], "🔍 Findings/Insights", "nav_findings", "Findings/Insights")
+    nav_button(nav_cols[5], "🔍 Suggestions", "nav_findings", "Findings/Insights")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -122,7 +122,7 @@ def show_home_page():
         """)
     with col4:
         st.markdown("""
-        **🔍 Insights Module**  
+        **🔍 Suggestions**  
         - Recommendations & fairness analysis  
         """)
 
