@@ -12,6 +12,8 @@ import nltk
 from collections import Counter
 from io import BytesIO
 
+
+
 # Optional Gemini (Google) integration
 try:
     import google.generativeai as genai
@@ -19,11 +21,23 @@ try:
 except Exception:
     GEMINI_OK = False
 
+
+# Optional GROQ integration
+try:
+    from groq import Groq
+    GROQ_OK = True
+except Exception:
+    GROQ_OK = False
+
+
+
 # Ensure VADER is present
 try:
     nltk.data.find("sentiment/vader_lexicon.zip")
 except LookupError:
     nltk.download("vader_lexicon")
+
+
 
 # WordCloud availability
 _WORDCLOUD_OK = True
@@ -34,41 +48,6 @@ except Exception:
     _WORDCLOUD_OK = False
 
 
-# ====================== SMART REPHRASING LAYER ======================
-def clean_rephrase(text: str) -> str:
-    """
-    Convert raw phrase/theme into a short improvement suggestion.
-    Does NOT rewrite the user sentence, only maps to a short category
-    when possible.
-    """
-    if text is None:
-        return ""
-    t = str(text).strip().lower()
-    if not t:
-        return ""
-
-    mapping = {
-        ("communicat", "inform", "announce", "notify"): "Better communication",
-        ("recognition", "appreciation", "reward", "recognise"): "Improve recognition process",
-        ("delay", "late", "slow", "approval", "approvals"): "Reduce delays",
-        ("visible", "visibility", "see", "noticed"): "More visibility",
-        ("transparent", "clarity", "clear"): "Increase transparency",
-        ("workflow", "process", "steps", "procedure"): "Improve process",
-        ("fast", "quick", "speed", "faster"): "Faster process",
-        ("support", "help", "assist"): "More support required",
-        ("feedback", "suggestion", "input"): "More constructive feedback",
-        ("engage", "interesting", "fun", "interactive"): "Increase engagement",
-        ("ux", "interface", "design", "user experience"): "Improve user experience",
-        ("fair", "bias", "equal"): "Ensure fairness",
-        ("train", "onboard", "learn"): "Better training",
-    }
-
-    for keys, category in mapping.items():
-        if any(k in t for k in keys):
-            return category
-
-    # Fallback – lightly cleaned original text
-    return t.capitalize()
 
 
 # ================= GLASS / MONOCHROME UI CSS =================
@@ -81,6 +60,7 @@ body {
 }
 .main > div { padding-top: 0.5rem; }
 h1, h2, h3, h4 { color: #222222 !important; }
+
 
 /* Metric card */
 .metric-card {
@@ -95,6 +75,7 @@ h1, h2, h3, h4 { color: #222222 !important; }
 .metric-card h4 { font-size: 0.95rem; font-weight: 600; color: #6b7280; margin-bottom: 0.4rem; }
 .metric-card h2 { font-size: 1.7rem; font-weight: 700; color: #111827; margin: 0; }
 
+
 /* KPI help */
 .kpi-label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .kpi-help { position: relative; font-size: 0.75rem; color: #6b7280; border-radius: 999px; border: 1px solid #d4d4d8; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; cursor: help; background-color: #f9fafb; }
@@ -102,13 +83,17 @@ h1, h2, h3, h4 { color: #222222 !important; }
 .kpi-help::before { content: ""; position: absolute; left: 50%; bottom: 115%; transform: translateX(-50%); border-width: 5px; border-style: solid; border-color: #111827 transparent transparent transparent; opacity: 0; transition: opacity 0.15s ease-out; }
 .kpi-help:hover::after, .kpi-help:hover::before { opacity: 1; }
 
+
 /* Plot wrapper */
 .stPlotlyChart { background: radial-gradient(circle at top left, rgba(255,255,255,0.96), rgba(243,244,246,1)); border-radius: 16px; padding: 12px; border: 1px solid rgba(209,213,219,0.9); box-shadow: 0 10px 30px rgba(15,23,42,0.12); }
+
 
 /* Section titles */
 .section-title { font-weight: 600; font-size: 1.05rem; color: #374151; margin-bottom: 0.4rem; }
 </style>
 """
+
+
 
 
 # ================= COLUMN KEYS =================
@@ -129,6 +114,8 @@ COLS = {
 }
 
 
+
+
 # ================= LOAD SURVEY =================
 @st.cache_data
 def load_survey_data():
@@ -142,8 +129,12 @@ def load_survey_data():
     return df
 
 
+
+
 def clean_text(x):
     return "" if pd.isna(x) else str(x).strip()
+
+
 
 
 def parse_awards(cell):
@@ -158,10 +149,14 @@ def parse_awards(cell):
     ]
 
 
+
+
 # ================= SCORE HELPERS =================
 def earlier_rating_score(df: pd.DataFrame):
     s = pd.to_numeric(df[COLS["earlier_rating"]], errors="coerce")
     return float((s.mean() / 3) * 100) if not s.dropna().empty else np.nan
+
+
 
 
 def score_sentiment_texts(texts):
@@ -173,19 +168,40 @@ def score_sentiment_texts(texts):
     return float(np.mean(vals))
 
 
+
+
 def current_sentiment_score(df: pd.DataFrame):
-    fields = ["like_current", "improve_current", "comments_any"]
+    fields = ["like_current", "improve_current"]
     texts = []
     for key in fields:
         texts.extend(df[COLS[key]].astype(str).tolist())
     return score_sentiment_texts(texts)
 
 
+
+
 def recognition_reach_rate(df: pd.DataFrame):
-    col_aw = COLS["which_awards"]
-    has_awards = df[col_aw].apply(lambda x: len(parse_awards(x)) > 0)
-    total = len(df)
-    return float(has_awards.sum() / total * 100) if total else np.nan
+    col = COLS["have_current"]  # "Have you ever received or given an award in the current Kudos Bot system?"
+    s = df[col].astype(str).str.strip().str.lower()
+
+    # consider only people who answered something
+    answered = s[~s.isin(["", "nan"])]
+    if answered.empty:
+        return np.nan
+
+    # treat these as "recognized in current system"
+    yes_vals = {
+        "yes", 
+        "i have received", 
+        "i have both given and received", 
+        "both", 
+        "given and received"
+    }
+
+    got_recognised = answered.isin(yes_vals)
+
+    return float(got_recognised.sum() / len(answered) * 100)
+
 
 
 # ================= COLOR HELPERS =================
@@ -194,8 +210,12 @@ def _hex_to_rgb(h: str):
     return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
 
+
+
 def _rgb_to_hex(rgb):
     return "#%02x%02x%02x" % rgb
+
+
 
 
 def _make_freq_color_func(freq_dict, colormap_name: str):
@@ -208,9 +228,11 @@ def _make_freq_color_func(freq_dict, colormap_name: str):
     else:
         light_hex, dark_hex = "#e5e7eb", "#4b5563"
 
+
     light_rgb = _hex_to_rgb(light_hex)
     dark_rgb = _hex_to_rgb(dark_hex)
     max_freq = max(freq_dict.values()) if freq_dict else 1.0
+
 
     def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
         f = freq_dict.get(word, 0.0) / max_freq
@@ -220,94 +242,171 @@ def _make_freq_color_func(freq_dict, colormap_name: str):
         b = int(light_rgb[2] + (dark_rgb[2] - light_rgb[2]) * f)
         return _rgb_to_hex((r, g, b))
 
+
     return color_func
 
 
-# ================= GEMINI CLUSTERING =================
-def _extract_json_block(text: str) -> str | None:
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    if m:
-        return m.group(0)
-    return None
 
 
+# ================= AI CLUSTERING (ONLY FOR IMPROVEMENTS) =================
 def gemini_cluster_phrases(phrases, section_name: str):
+    """
+    Use AI to rephrase suggestions while preserving exact meaning.
+    ONLY used for Improvement Suggestions.
+    """
+    # ✅ HARDCODED API KEYS
+    FALLBACK_GEMINI_KEY = "AIzaSyC43DGWdR3LJbxPvFXL9oZDTUA7f7wry_0"
+    FALLBACK_GROQ_KEY = "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"
+    
     freq = Counter(phrases)
     unique_phrases = list(freq.keys())
 
     default_mapping = [{"theme": p, "phrases": [p]} for p in unique_phrases]
 
-    if not GEMINI_OK or not unique_phrases:
-        mapping = default_mapping
-    else:
-        try:
-            api_key = os.environ.get("GEMINI_API_KEY")
-            if api_key:
-                genai.configure(api_key=api_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
+    if not unique_phrases:
+        return {}, {}, freq
 
-            sample_text = "\n".join(f"- {p}" for p in unique_phrases[:120])
+    sample_text = "\n".join(f"{i+1}. {p}" for i, p in enumerate(unique_phrases[:150]))
 
-            prompt = f"""
-You are analysing employee survey feedback for section: "{section_name}".
+    prompt = f"""
+You are analyzing employee survey feedback for: "{section_name}".
 
-Group similar phrases into themes. Respond ONLY with JSON in the form:
+Your task: REPHRASE each suggestion to be SHORTER while preserving EXACT meaning.
 
+CRITICAL RULES:
+1. **Preserve meaning**: The shortened version must mean EXACTLY the same thing
+2. **Only group IDENTICAL suggestions**: If two phrases say the same thing differently, group them
+3. **DO NOT merge different ideas**: If suggestions are about different topics, keep them separate
+4. **Make it concise**: Use 3-6 words maximum for the rephrased version
+5. **Use original phrases** in the "phrases" array - don't invent new ones
+
+Return JSON in this exact format:
 {{
   "clusters": [
     {{
-      "theme": "short 3-6 word label",
-      "phrases": ["original phrase 1", "original phrase 2", ...]
-    }},
-    ...
+      "theme": "Short rephrased version (3-6 words)",
+      "phrases": ["original phrase 1", "original phrase 2"]
+    }}
   ]
 }}
 
-Important rules:
-- Use the original phrases EXACTLY in "phrases".
-- Do NOT add any commentary outside the JSON.
-- Do NOT invent new phrases.
-
-Phrases:
+Survey responses:
 {sample_text}
-"""
-            resp = model.generate_content(prompt)
-            raw = resp.text or ""
-            json_block = _extract_json_block(raw) or raw
-            data = json.loads(json_block)
-            mapping = data.get("clusters", default_mapping) or default_mapping
-        except Exception:
-            mapping = default_mapping
 
-    phrase_to_theme: dict[str, str] = {}
-    theme_freq: Counter[str] = Counter()
+JSON output:
+"""
+
+    mapping = default_mapping
+    ai_used = "None"
+    error_details = []  # ✅ COLLECT ALL ERRORS
+
+    # TRY GEMINI FIRST
+    if GEMINI_OK:
+        try:
+            gemini_api_key = os.environ.get("GEMINI_API_KEY") or FALLBACK_GEMINI_KEY
+            
+            if gemini_api_key:
+                genai.configure(api_key=gemini_api_key)
+                model_names = ["gemini-1.5-flash-002", "gemini-1.5-flash", "gemini-pro"]
+                
+                for model_name in model_names:
+                    try:
+                        model = genai.GenerativeModel(model_name)
+                        resp = model.generate_content(prompt)
+                        raw = resp.text or ""
+                        
+                        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+                        if json_match:
+                            data = json.loads(json_match.group(0))
+                            mapping = data.get("clusters", default_mapping) or default_mapping
+                            ai_used = f"Gemini ({model_name})"
+                            break
+                    except Exception as e:
+                        error_details.append(f"Gemini {model_name}: {str(e)[:150]}")
+                        continue
+                    
+        except Exception as e:
+            error_details.append(f"Gemini setup: {str(e)[:150]}")
+
+    # FALLBACK TO GROQ
+    if ai_used == "None" and GROQ_OK:
+        try:
+            groq_api_key = os.environ.get("GROQ_API_KEY") or FALLBACK_GROQ_KEY
+            
+            if groq_api_key:
+                client = Groq(api_key=groq_api_key)
+                groq_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+                
+                for model_name in groq_models:
+                    try:
+                        completion = client.chat.completions.create(
+                            model=model_name,
+                            messages=[
+                                {"role": "system", "content": "You are an expert at analyzing survey feedback."},
+                                {"role": "user", "content": prompt}
+                            ],
+                            temperature=0.3,
+                            max_tokens=4096,
+                        )
+                        
+                        raw = completion.choices[0].message.content
+                        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+                        if json_match:
+                            data = json.loads(json_match.group(0))
+                            mapping = data.get("clusters", default_mapping) or default_mapping
+                            ai_used = f"GROQ ({model_name})"
+                            break
+                    except Exception as e:
+                        error_details.append(f"GROQ {model_name}: {str(e)[:150]}")
+                        continue
+                    
+        except Exception as e:
+            error_details.append(f"GROQ setup: {str(e)[:150]}")
+
+    # ✅ SHOW DETAILED STATUS
+    if ai_used != "None":
+        st.success(f"✅ AI-powered summarization by {ai_used}")
+    else:
+        # Show detailed error in expander
+        with st.expander("⚠️ AI temporarily unavailable. Click to see error details"):
+            st.warning("Using original phrases (no AI summarization).")
+            st.markdown("**Detailed errors:**")
+            for err in error_details:
+                st.code(err)
+            st.markdown("""
+            **Possible fixes:**
+            1. **Get fresh GROQ key**: https://console.groq.com/keys
+            2. **Replace FALLBACK_GROQ_KEY** in code (line 266)
+            3. **Restart Streamlit**
+            """)
+
+    # Build maps
+    phrase_to_theme = {}
+    theme_freq = Counter()
 
     for cl in mapping:
-        theme_raw = cl.get("theme") or ""
-        theme = clean_rephrase(theme_raw)
+        theme = cl.get("theme", "").strip()
         if not theme:
             continue
 
         for p in cl.get("phrases", []):
             p_clean = str(p).strip()
-            if not p_clean:
-                continue
             if p_clean in freq:
                 phrase_to_theme[p_clean] = theme
                 theme_freq[theme] += freq[p_clean]
 
-    # ensure every phrase has a theme
     for p, c in freq.items():
         if p not in phrase_to_theme:
-            theme_clean = clean_rephrase(p)
-            phrase_to_theme[p] = theme_clean
-            theme_freq[theme_clean] += c
+            phrase_to_theme[p] = p
+            theme_freq[p] += c
 
     return theme_freq, phrase_to_theme, freq
 
 
-# ================= WORDCLOUD (WITH FUNCTIONAL IMPROVEMENTS VIEW) =================
-def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool = False):
+
+
+# ================= WORDCLOUD =================
+def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool = False, use_ai: bool = False):
     if not _WORDCLOUD_OK:
         st.info("WordCloud not available.")
         return
@@ -321,10 +420,7 @@ def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool =
 
     if phrase_cloud:
         parts = []
-        noise = {
-            "na", "n/a", "none", "no", "-", "nil", "nan",
-            "neutral", "not sure", "no idea", "cant say", "can't say",
-        }
+        noise = {"na", "n/a", "none", "no", "-", "nil", "nan", "neutral", "not sure", "no idea", "cant say", "can't say"}
 
         for t in texts:
             t = t.replace("\r", " ").replace("\n", " ")
@@ -338,31 +434,31 @@ def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool =
             st.info(f"No usable phrases for {title}")
             return
 
-        # Cluster phrases into themes (Gemini if available)
-        theme_freq, phrase_to_theme, raw_freq = gemini_cluster_phrases(parts, section_name)
+        # ✅ ONLY USE AI IF use_ai=True
+        if use_ai:
+            theme_freq, phrase_to_theme, raw_freq = gemini_cluster_phrases(parts, section_name)
+        else:
+            # Regular frequency count (no AI)
+            raw_freq = Counter(parts)
+            theme_freq = raw_freq
+            phrase_to_theme = {p: p for p in parts}
 
-        # ===== Store mapping for Excel + interactive explorer (Improvements only) =====
-        if section_name == "Improvement Suggestions":
+        # Store mapping for Excel (Improvements only)
+        if section_name == "Improvement Suggestions" and use_ai:
             rows = []
-            theme_to_phrases: dict[str, dict] = {}
+            theme_to_phrases = {}
 
             for phrase, count in raw_freq.items():
-                theme_raw = phrase_to_theme.get(phrase, phrase)
-                theme_clean = clean_rephrase(theme_raw)
+                theme = phrase_to_theme.get(phrase, phrase)
 
-                rows.append(
-                    {
-                        "Section": section_name,
-                        "Original Phrase": phrase,
-                        "Count": count,
-                        "Theme (Cleaned)": theme_clean,
-                    }
-                )
+                rows.append({
+                    "Section": section_name,
+                    "Original Phrase": phrase,
+                    "Count": count,
+                    "Theme (AI-Summarized)": theme,
+                })
 
-                bucket = theme_to_phrases.setdefault(
-                    theme_clean,
-                    {"count": 0, "items": []},
-                )
+                bucket = theme_to_phrases.setdefault(theme, {"count": 0, "items": []})
                 bucket["count"] += count
                 bucket["items"].append((phrase, count))
 
@@ -371,7 +467,6 @@ def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool =
                 maps = st.session_state.setdefault("phrase_maps", [])
                 maps.append(df_map)
 
-            # save for interactive theme explorer
             st.session_state["improvement_themes"] = theme_to_phrases
 
         wc = WordCloud(
@@ -385,7 +480,6 @@ def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool =
         ).generate_from_frequencies(theme_freq)
 
         wc = wc.recolor(color_func=_make_freq_color_func(theme_freq, colormap))
-
         fig, ax = plt.subplots(figsize=(14, 4.5))
     else:
         text_blob = " ".join(texts)
@@ -409,6 +503,8 @@ def show_wordcloud(texts, title, colormap: str = "viridis", phrase_cloud: bool =
     st.pyplot(fig)
 
 
+
+
 # ================= KPI DISPLAY =================
 def safe_metric(v, label, help_text, suffix: str = ""):
     tip = html.escape(str(help_text), quote=True)
@@ -418,10 +514,7 @@ def safe_metric(v, label, help_text, suffix: str = ""):
     else:
         try:
             val = float(v)
-            if np.isnan(val):
-                display = "–"
-            else:
-                display = f"{int(round(val))}{suffix}"
+            display = f"{int(round(val))}{suffix}" if not np.isnan(val) else "–"
         except Exception:
             display = f"{v}{suffix}"
 
@@ -441,9 +534,10 @@ def safe_metric(v, label, help_text, suffix: str = ""):
     )
 
 
+
+
 # ================= SAFELY CLEAN LIST UTILITY =================
 def clean_list(values):
-    """Return a cleaned list of non-empty, non-noise strings from values."""
     bad = {"", "na", "n/a", "-", "none", "nil", "nan", "no suggestions", "nothing", "no", "no comments"}
     out = []
     for v in values:
@@ -453,13 +547,13 @@ def clean_list(values):
     return out
 
 
+
+
 # ================= MAIN DASHBOARD =================
 def show_rr_dashboard():
-    # reset phrase maps + interactive data each run
     st.session_state["phrase_maps"] = []
     st.session_state["improvement_themes"] = {}
 
-    # Apply global styles using the selected theme
     theme = st.session_state.get("theme", "Blue")
     try:
         styles.apply_styles(theme=theme)
@@ -467,12 +561,11 @@ def show_rr_dashboard():
         pass
     st.markdown(glass_css, unsafe_allow_html=True)
 
-    # ---- Load data first so we know response count ----
     df = load_survey_data()
     survey_participants = df
     response_count = len(survey_participants)
 
-    # ✅ GREEN BANNER AT THE TOP
+    # GREEN BANNER
     st.markdown(
         f"""
         <div style="
@@ -493,13 +586,12 @@ def show_rr_dashboard():
         unsafe_allow_html=True,
     )
 
-    # Existing caption just under the green banner
     st.caption(
-        "Comparing the earlier Town Hall-based R&R with the current Kudos Bot system "
+        "Comparing the earlier ALL-Hands R&R with the current Kudos Bot system "
         "using participant feedback, sentiment and recognition reach."
     )
 
-    # ---------- KPI VALUES ----------
+    # KPI VALUES
     earlier_score = earlier_rating_score(survey_participants)
     current_score = current_sentiment_score(survey_participants)
     reach = recognition_reach_rate(survey_participants)
@@ -519,11 +611,7 @@ def show_rr_dashboard():
         safe_metric(
             earlier_score,
             "Earlier System Happiness Score (/100)",
-            (
-                "Average rating for the old Town Hall R&R on a 1–3 scale, "
-                "rescaled to a 0–100 happiness score. "
-                "Unit: score out of 100 (/100)."
-            ),
+            "Average rating for the old All-Hands R&R on a 1–3 scale, rescaled to a 0–100 happiness score.",
             suffix="/100",
         )
 
@@ -531,24 +619,15 @@ def show_rr_dashboard():
         safe_metric(
             current_score,
             "Current System Happiness Score (/100)",
-            (
-                "VADER sentiment on all comments about the current Kudos Bot system. "
-                "The compound score (−1 to +1) is converted to a 0–100 index using: "
-                "((compound + 1) / 2) × 100. "
-                "Unit: score out of 100 (/100)."
-            ),
+            "VADER sentiment on all comments about the current Kudos Bot system. The compound score (−1 to +1) is converted to a 0–100 index.",
             suffix="/100",
         )
 
     with k[2]:
         safe_metric(
             reach,
-            "How Many People Got Recognized (%)",
-            (
-                "Percentage of all survey respondents who say they have received "
-                "at least one award (based on the 'Which award(s) have you received?' question). "
-                "Unit: percentage of respondents (%)."
-            ),
+            "People who got received atleast one award (%)",
+            "Percentage of all survey respondents who say they have received at least one award.",
             suffix="%",
         )
 
@@ -556,28 +635,66 @@ def show_rr_dashboard():
         safe_metric(
             lift,
             "Current System Effectiveness (%)",
-            (
-                "Relative change in happiness between the current Kudos Bot system and the earlier "
-                "Town Hall system. Formula: ((Current Score − Earlier Score) ÷ Earlier Score) × 100. "
-                "Unit: percentage change (%)."
-            ),
+            "Relative change in happiness between the current Kudos Bot system and the earlier All-Hands system.",
             suffix="%",
         )
 
     st.caption(
         "Happiness metrics are on a 0–100 scale (/100). "
-        "'Current System Effectiveness (%)' shows how much the current system improves or drops "
-        "vs the earlier one."
+        "'Current System Effectiveness (%)' shows how much the current system improves or drops vs the earlier one."
     )
 
     st.divider()
 
-    # ---- rest of your existing function stays unchanged ----
-    # (engagement pie, awards bar, likes wordclouds, improvements cloud,
-    #  interactive theme explorer, Excel download, etc.)
-    # ...
+    # ✅ ENGAGEMENT PIE CHART (WITH CUSTOM LABEL FOR "BOTH EQUALLY ENGAGING")
+    st.markdown("<p class='section-title'>📊 Which version is more engaging?</p>", unsafe_allow_html=True)
 
-    # Awards (survey-based)
+    engaging_col = COLS["engaging"]
+    if engaging_col in survey_participants.columns:
+        engaging_data = survey_participants[engaging_col].value_counts().reset_index()
+        engaging_data.columns = ["Version", "Count"]
+        
+        # ✅ FILTER OUT "Both are equally engaging" for pie chart
+        both_engaging = engaging_data[engaging_data["Version"].str.contains("both", case=False, na=False)]
+        both_count = both_engaging["Count"].sum() if not both_engaging.empty else 0
+        
+        # Only show "Earlier" vs "Current" in pie chart
+        pie_data = engaging_data[~engaging_data["Version"].str.contains("both", case=False, na=False)]
+        
+        if not pie_data.empty:
+            fig_pie = px.pie(
+                pie_data,
+                names="Version",
+                values="Count",
+                title="R&R Program Engagement Preference",
+                color_discrete_sequence=["#2563EB", "#10B981", "#F59E0B"],
+            )
+
+            fig_pie.update_traces(
+                textposition="inside",
+                textinfo="percent+label",
+                marker=dict(line=dict(color="white", width=2)),
+            )
+
+            fig_pie.update_layout(
+                template="plotly_white",
+                height=400,
+                margin=dict(l=20, r=20, t=60, b=20),
+                title_font_size=18,
+            )
+
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+            # ✅ SHOW "BOTH EQUALLY ENGAGING" COUNT BELOW PIE CHART
+            if both_count > 0:
+                st.info(f"ℹ️ **{both_count} people** voted that both versions are equally engaging.")
+        else:
+            st.info("Engagement data not available.")
+
+
+    st.divider()
+
+    # Awards
     st.markdown("<p class='section-title'>🏅 Who is getting recognised?</p>", unsafe_allow_html=True)
 
     awards = []
@@ -588,13 +705,7 @@ def show_rr_dashboard():
         counts = pd.Series(awards).value_counts().reset_index()
         counts.columns = ["Award", "Recognitions"]
 
-        overview_palette = [
-            "#2563EB",
-            "#10B981",
-            "#F59E0B",
-            "#EC4899",
-            "#8B5CF6",
-        ]
+        overview_palette = ["#2563EB", "#10B981", "#F59E0B", "#EC4899", "#8B5CF6"]
 
         fig_aw = px.bar(
             counts,
@@ -606,12 +717,7 @@ def show_rr_dashboard():
             color_discrete_sequence=overview_palette,
         )
 
-        fig_aw.update_traces(
-            textposition="outside",
-            textfont_size=14,
-            marker_line_width=0,
-        )
-
+        fig_aw.update_traces(textposition="outside", textfont_size=14, marker_line_width=0)
         fig_aw.update_layout(
             template="plotly_white",
             height=420,
@@ -619,9 +725,6 @@ def show_rr_dashboard():
             xaxis_title="Award Type",
             yaxis_title="Number of Mentions in Survey",
             title_font_size=20,
-            xaxis=dict(tickfont=dict(size=13)),
-            yaxis=dict(tickfont=dict(size=13)),
-            legend=dict(title_text="Award", font=dict(size=12)),
         )
 
         st.plotly_chart(fig_aw, use_container_width=True)
@@ -630,7 +733,7 @@ def show_rr_dashboard():
 
     st.divider()
 
-    # WORD MAPS – likes (Gemini themes)
+    # ✅ LIKES - NO AI
     st.markdown("<p class='section-title'>🧠 What people liked — Earlier vs Current</p>", unsafe_allow_html=True)
 
     earlier_like_raw = survey_participants[COLS["earlier_like"]].astype(object).tolist()
@@ -641,53 +744,32 @@ def show_rr_dashboard():
 
     c1, c2 = st.columns(2)
     with c1:
-        show_wordcloud(
-            earlier_likes,
-            "Earlier Likes",
-            colormap="Blues",
-            phrase_cloud=True,
-        )
+        show_wordcloud(earlier_likes, "Earlier Likes", colormap="Blues", phrase_cloud=True, use_ai=False)
     with c2:
-        show_wordcloud(
-            current_likes,
-            "Current Likes",
-            colormap="Oranges",
-            phrase_cloud=True,
-        )
+        show_wordcloud(current_likes, "Current Likes", colormap="Oranges", phrase_cloud=True, use_ai=False)
 
     st.divider()
 
-    # IMPROVEMENTS – theme cloud
+    # ✅ IMPROVEMENTS - WITH AI
     st.markdown("<p class='section-title'>🔧 Key improvement suggestions</p>", unsafe_allow_html=True)
 
     raw_improvements = survey_participants[COLS["improve_current"]].astype(object).tolist()
     improvements = clean_list(raw_improvements)
 
-    show_wordcloud(
-        improvements,
-        "Improvement Suggestions",
-        colormap="Spectral",
-        phrase_cloud=True,
-    )
+    show_wordcloud(improvements, "Improvement Suggestions", colormap="Spectral", phrase_cloud=True, use_ai=True)
 
     st.caption(
-        "Phrases are clustered into themes using Gemini (if available). "
-        "Each word in the cloud is a theme label; size and colour reflect how many responses map to that theme."
+        "Phrases are AI-summarized to preserve meaning while being concise. "
+        "Each word in the cloud is a condensed version; size and colour reflect frequency."
     )
 
-
-    # ================= EXCEL DOWNLOAD + THEME EXPLORER =================
+    # THEME EXPLORER
     themes_data = st.session_state.get("improvement_themes") or {}
 
-    # 🔹 Expander first
     if themes_data:
         st.markdown("#### Explore improvement suggestions by theme")
-        with st.expander("View themes, counts, and underlying comments", expanded=False):
-            for theme in sorted(
-                themes_data.keys(),
-                key=lambda t: themes_data[t]["count"],
-                reverse=True,
-            ):
+        with st.expander("View summarized themes with original comments", expanded=False):
+            for theme in sorted(themes_data.keys(), key=lambda t: themes_data[t]["count"], reverse=True):
                 bucket = themes_data[theme]
                 total_count = bucket["count"]
                 items = sorted(bucket["items"], key=lambda x: x[1], reverse=True)
@@ -697,7 +779,6 @@ def show_rr_dashboard():
                     st.markdown(f"- **{count}×** {phrase}")
                 st.markdown("---")
 
-    # 🔹 Download button directly BELOW the expander
     if st.session_state.get("phrase_maps"):
         all_maps = pd.concat(st.session_state["phrase_maps"], ignore_index=True)
 
@@ -711,7 +792,7 @@ def show_rr_dashboard():
         st.download_button(
             "⬇️ Download phrase → theme mapping (Excel)",
             data=output,
-            file_name="mapping_Gemini.xlsx",
+            file_name="phrase_themes_ai_summarized.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
