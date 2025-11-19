@@ -64,7 +64,6 @@ def show_suggestions_page():
     spot_html = spot_text.replace("\n", "<br>")
     templates_html = templates_text.replace("\n", "<br>")
     personalisation_html = personalisation_text.replace("\n", "<br>")
-    single_html = single_award_text.replace("\n", "<br>")
 
     # ---------- DISPLAY CARDS ----------
     st.markdown(card_style.format(

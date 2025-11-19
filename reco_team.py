@@ -5,7 +5,6 @@ import plotly.express as px
 import re
 import html
 
-
 # -----------------------
 # Global Glass / KPI CSS
 # -----------------------
@@ -75,7 +74,6 @@ glass_css = """
 </style>
 """
 
-
 # -----------------------
 # ✅ GLOSSARY HELPER - COLLAPSIBLE EXPANDER
 # -----------------------
@@ -83,7 +81,6 @@ def show_glossary(title: str, description: str):
     """Display a collapsible glossary expander below charts"""
     with st.expander(f"📖 {title}", expanded=False):
         st.markdown(description)
-
 
 # -----------------------
 # Helpers
@@ -95,7 +92,6 @@ def normalize_name(name):
     name = re.sub(r"\s+", " ", name)
     name = re.sub(r"[^a-z\s]", "", name)
     return name
-
 
 def _find_amount_col(df: pd.DataFrame) -> str | None:
     candidates = [
@@ -113,7 +109,6 @@ def _find_amount_col(df: pd.DataFrame) -> str | None:
             return c
     return None
 
-
 def _to_number(series: pd.Series) -> pd.Series:
     s = series.astype(str)
     s = s.str.replace("\u20b9", "", regex=False)
@@ -121,7 +116,6 @@ def _to_number(series: pd.Series) -> pd.Series:
     s = s.str.strip()
     extracted = s.str.extract(r"(-?\d+(?:\.\d+)?)", expand=False)
     return pd.to_numeric(extracted, errors="coerce").fillna(0.0)
-
 
 def load_and_process_data():
     url = "https://docs.google.com/spreadsheets/d/1xVpXomZBOyIeyvpyDjXQlSEIfU35v6j0jkhdaETm4-Q/export?format=xlsx"
@@ -167,7 +161,6 @@ def load_and_process_data():
 
     return df
 
-
 def clean_teamname_df(df, column='Team name'):
     if df.empty:
         return df
@@ -177,7 +170,6 @@ def clean_teamname_df(df, column='Team name'):
     df_cleaned = df_cleaned[df_cleaned[column].astype(str).str.strip() != ''].copy()
     
     return df_cleaned
-
 
 # -----------------------
 # KPIs
@@ -329,7 +321,6 @@ def display_team_level_kpis(
 
     st.caption("**Note:** All KPIs react to the selected award types and filters.")
 
-
 # -----------------------
 # Team frequency table
 # -----------------------
@@ -423,7 +414,6 @@ def build_team_frequency_table(
 
     return grouped
 
-
 # -----------------------
 # LINE CHARTS
 # -----------------------
@@ -454,7 +444,6 @@ def build_allhands_trend(df_allhands, selected_years, time_period):
     )
     
     return trend_df
-
 
 def build_kudos_trend(df_kudos, selected_years, time_period, employee_team_map):
     dfs = []
@@ -501,7 +490,6 @@ def build_kudos_trend(df_kudos, selected_years, time_period, employee_team_map):
     
     return trend_df
 
-
 # -----------------------
 # Main UI
 # -----------------------
@@ -512,7 +500,6 @@ def show_recognition_team_tab():
 
     df = load_and_process_data()
 
-    # st.title("Team-Level Trends")
     st.caption(
         "These charts show *team-level trends* for **Team Awards**, **Spot Awards**, **Champion Awards**, and **Awesome Awards**. "
         "**All Hands** represents the legacy ceremony, and **Kudos Corner** represents the new system."
@@ -525,15 +512,11 @@ def show_recognition_team_tab():
         .drop_duplicates()
     )
 
-    # -------- Filters --------
+    # -------- Filters (WITHOUT PERIOD) --------
     with st.container():
-        col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 2])
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
 
         with col1:
-            period_options = ["Monthly", "Quarterly", "Yearly"]
-            time_period = st.selectbox("Select Period", period_options, index=0, key="team_period_select")
-
-        with col2:
             years = sorted(df['year'].dropna().unique())
             year_options = ["All"] + [int(y) for y in years]
             selected_years_raw = st.multiselect(
@@ -547,7 +530,7 @@ def show_recognition_team_tab():
             else:
                 selected_years = [int(y) for y in selected_years_raw if y != "All"]
 
-        with col3:
+        with col2:
             team_mode = st.selectbox(
                 "Display Teams by",
                 ["All Teams", "Most Couponed Teams", "Single Team"],
@@ -555,7 +538,7 @@ def show_recognition_team_tab():
                 key="team_mode_select"
             )
 
-        with col4:
+        with col3:
             teams_filtered_by_year = sorted(
                 clean_teamname_df(df[df['year'].isin(selected_years)])['Team name'].unique()
             )
@@ -571,7 +554,7 @@ def show_recognition_team_tab():
             else:
                 top_team_count = None
 
-        with col5:
+        with col4:
             award_options = ["All", "Team Award", "Spot Award", "Champion Award", "Awesome Award"]
             selected_awards = st.multiselect(
                 "Award Types",
@@ -735,9 +718,18 @@ def show_recognition_team_tab():
             "Row colors indicate highest award: Purple (Champion), Green (Spot), Blue (Team only)."
         )
 
-    # -------- LINE CHARTS --------
+    # -------- LINE CHARTS WITH PERIOD FILTER --------
     st.markdown("---")
     st.subheader("Award Trends Over Time")
+    
+    # ✅ PERIOD FILTER MOVED HERE
+    period_options = ["Monthly", "Quarterly", "Yearly"]
+    time_period = st.selectbox(
+        "Select Time Period for Trend Charts", 
+        period_options, 
+        index=0, 
+        key="team_period_select"
+    )
     
     trend_allhands = build_allhands_trend(df_allhands, selected_years, time_period)
     if trend_allhands is not None and not trend_allhands.empty:
@@ -817,11 +809,6 @@ def show_recognition_team_tab():
             "Kudos Corner Award Trend",
             "Product teams: all awards. Other teams: Team + Champion only. Tracks new system performance since June 2025."
         )
-
-    # ============================================================
-    # ✅ AWESOME AWARDS - RECIPROCAL NOMINATIONS
-    # ============================================================
-
 
 if __name__ == "__main__":
     show_recognition_team_tab()
