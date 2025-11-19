@@ -441,11 +441,6 @@ def show_award_analysis():
             yaxis_title="Recognition Score",
         )
         st.plotly_chart(fig3, use_container_width=True)
-
-        st.caption(
-            "**Recognition Score** = (People Count × 0.6) + (Award Count × 0.4) — "
-            "This balanced metric considers both team size and total awards received."
-        )
     else:
         st.info("No team data available for the current filters.")
 
