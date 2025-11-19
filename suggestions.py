@@ -29,7 +29,7 @@ def show_suggestions_page():
     • Consider renaming the “Awesome Award” to a stronger title such as “Appreciation Award” or “Impact Award”.
     • Restrict repeated nominations for the same person within short intervals.
     • Automatically flag vague or low-effort justifications for review before approval.
-    • Create a separate GMeet/Chat channel exclusively for Appreciation/Impact Awards to reduce noise.
+    • Create a separate Chat channel exclusively for Awesome Awards to make the other awards more visible\.
     • Many respondents reported that certificates shared in chat could not be opened — this needs a fix.
     """
 
@@ -57,12 +57,7 @@ def show_suggestions_page():
     • Send a weekly R&R digest summarising recognitions: who was awarded and for what reason.
     """
 
-    # 5) Single-award contributors / under-recognised profiles
-    single_award_text = """
-    • Some employees appear only once in the award history despite contributing within strong teams.
-    • Track single-award contributors to evaluate whether they are being overlooked.
-    • Periodically highlight such contributors so managers can consider them for future recognitions.
-    """
+
 
     # ---------- CONVERT NEWLINES TO <br> ----------
     awesome_html = awesome_text.replace("\n", "<br>")
@@ -92,7 +87,3 @@ def show_suggestions_page():
         content=personalisation_html
     ), unsafe_allow_html=True)
 
-    st.markdown(card_style.format(
-        title="5. Support Under-Recognised Contributors",
-        content=single_html
-    ), unsafe_allow_html=True)

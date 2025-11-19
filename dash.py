@@ -78,17 +78,19 @@ with title_col:
             unsafe_allow_html=True,
         )
 
+    elif section == "Award Analysis":
+        st.markdown(
+            "<h2 style='text-align:center; margin-top:1rem;'>Award Analysis</h2>",
+            unsafe_allow_html=True,
+        )
+        
     elif section == "Recognition":
         st.markdown(
             "<h2 style='text-align:center; margin-top:1rem;'>Recognition Analysis</h2>",
             unsafe_allow_html=True,
         )
 
-    elif section == "Award Analysis":
-        st.markdown(
-            "<h2 style='text-align:center; margin-top:1rem;'>Award Analysis</h2>",
-            unsafe_allow_html=True,
-        )
+
 
     elif section == "Coupon Estimation":
         st.markdown(
@@ -140,9 +142,6 @@ with menu_col:
 # ------------------------------------------------------
 show_navbar()
 
-# ------------------------------------------------------
-# RECOGNITION PAGE TABS
-# ------------------------------------------------------
 def recognition_main():
     tab1, tab2 = st.tabs(["Team", "Individual"])
     with tab1:
@@ -159,11 +158,12 @@ if section == "Home":
 elif section == "Overview":
     show_rr_dashboard()
 
+elif section == "Award Analysis":
+    show_award_analysis()
+
 elif section == "Recognition":
     recognition_main()
 
-elif section == "Award Analysis":
-    show_award_analysis()
 
 elif section == "Coupon Estimation":
     show_coupon_estimation()

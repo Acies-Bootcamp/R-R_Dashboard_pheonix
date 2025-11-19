@@ -5,7 +5,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import re
 
-
 # Award Color Palette
 AWARD_COLORS = {
     "Team Award": "#A7C7E7",
@@ -14,15 +13,12 @@ AWARD_COLORS = {
     "Awesome Award": "#FFFACD",
     "OTA": "#FFCCCB",
 }
-
 ANALYSIS_AWARD_TYPES = [
     "Team Award",
     "Spot Award",
     "Champion Award",
     "Awesome Award",
 ]
-
-# ===================== TEAM NORMALIZATION =====================
 TEAM_NORMALIZATION = {
     "edgecore": "Edgecore",
     "edge core": "Edgecore",
@@ -30,10 +26,8 @@ TEAM_NORMALIZATION = {
     "greenmath team": "Greenmath",
     "greenmath launch": "Greenmath Launch",
     "greenmath  launch": "Greenmath Launch",
-    # add more variants here if you spot any in the raw data
+    # add more variants here as needed
 }
-
-
 def normalize_name(name):
     if pd.isna(name):
         return name
@@ -41,57 +35,28 @@ def normalize_name(name):
     name = re.sub(r"\s+", " ", name)
     name = re.sub(r"[^a-z\s]", "", name)
     return name
-
-
 def canonical_team(name: str) -> str:
-    """
-    Normalize and map raw team names into canonical labels.
-    """
     if not isinstance(name, str):
         return ""
     norm = normalize_name(name)
     if norm in TEAM_NORMALIZATION:
         return TEAM_NORMALIZATION[norm]
-    # fallback: cleaned title-case original
     return name.strip().title()
-
-
 def is_unknown_team(name) -> bool:
-    """
-    Return True if the team name is empty / NaN / or some 'Unknown...' placeholder.
-    These rows will be excluded from team-based charts.
-    """
-    if pd.isna(name):
-        return True
-
+    if pd.isna(name): return True
     s = str(name).strip().lower()
-    if not s:
-        return True
-
-    # simple exact placeholders
+    if not s: return True
     if s in {"nan", "none", "-", "unknown", "unknown team", "unknown team name", "unassigned"}:
         return True
-
-    # normalise non-letters to spaces and look for 'unknown' token
     s_clean = re.sub(r"[^a-z]", " ", s)
     tokens = s_clean.split()
-
-    # e.g. "unknown team name_aw", "unknown team name aw", etc.
-    if "unknown" in tokens:
-        return True
-
-    # extra safety: any string that starts with "unknown"
-    if s.startswith("unknown"):
-        return True
-
+    if "unknown" in tokens: return True
+    if s.startswith("unknown"): return True
     return False
-
-
 def map_sankey_bucket(title: str) -> str | None:
     if not isinstance(title, str):
         return None
     t = title.lower().strip()
-
     if "team" in t and "spot" not in t and "ota" not in t and "occasion" not in t:
         return "Team Award"
     if "spot" in t:
@@ -99,82 +64,51 @@ def map_sankey_bucket(title: str) -> str | None:
     if "ota" in t or "one time" in t or "one-time" in t:
         return "OTA"
     return None
-
-
 @st.cache_data
 def load_data():
     sheet_key = "1xVpXomZBOyIeyvpyDjXQlSEIfU35v6j0jkhdaETm4-Q"
     url = f"https://docs.google.com/spreadsheets/d/{sheet_key}/export?format=csv"
     df = pd.read_csv(url)
-
     df["Month"] = df["Month"].astype(str).str.strip().str.capitalize()
     df["year"] = pd.to_numeric(df["year"], errors="coerce")
-
-    month_map = {
-        "January": 1,
-        "February": 2,
-        "March": 3,
-        "April": 4,
-        "May": 5,
-        "June": 6,
-        "July": 7,
-        "August": 8,
-        "September": 9,
-        "October": 10,
-        "November": 11,
-        "December": 12,
-    }
+    month_map = {m: i+1 for i, m in enumerate([
+        "January","February","March","April","May","June","July","August",
+        "September","October","November","December"
+    ])}
     df["Month_Num"] = df["Month"].map(month_map)
     df["Date"] = pd.to_datetime(
-        dict(year=df["year"], month=df["Month_Num"], day=1),
-        errors="coerce",
+        dict(year=df["year"], month=df["Month_Num"], day=1), errors="coerce",
     )
-
     df["New_Award_title"] = df["New_Award_title"].astype(str).str.title().str.strip()
-
-    # canonicalise team names
     df["Team name"] = df["Team name"].astype(str).apply(canonical_team)
-
     return df
 
-
 def show_award_analysis():
-    """
-    Render the award analysis dashboard.
-    """
     theme = st.session_state.get("theme", "White")
     styles.apply_styles(theme=theme)
-
     df = load_data()
-
     st.markdown("<p class='section-title'>Filter Options</p>", unsafe_allow_html=True)
-    with st.container():
-        col1, col2, col3, col4 = st.columns(4)
 
-        # Period selector
+    with st.container():
+        col1, col2, col3 = st.columns(3)
         with col1:
             period = st.selectbox(
                 "Select Period",
                 ["Monthly", "Quarterly", "Yearly"],
                 index=0,
             )
-
-        # Year selector
         with col2:
             years = sorted(df["year"].dropna().astype(int).unique())
             year_options = ["All"] + list(years)
-
             selected_years_raw = st.multiselect(
                 "Select Year(s)",
                 options=year_options,
                 default=["All"],
             )
-
             if "All" in selected_years_raw or not selected_years_raw:
                 selected_years = list(years)
             else:
                 selected_years = [int(y) for y in selected_years_raw if y != "All"]
-
         with col3:
             award_type_options = ["All"] + ANALYSIS_AWARD_TYPES
             selected_award_types_raw = st.multiselect(
@@ -187,30 +121,17 @@ def show_award_analysis():
             else:
                 award_types = selected_award_types_raw
 
-        with col4:
-            recognition_systems = sorted(df["Nominated In"].dropna().unique())
-            rec_options = ["All"] + recognition_systems
-            selected_sys = st.multiselect(
-                "Recognition System", rec_options, default=["All"]
-            )
+    # Team name selector, depends on year filter
+    team_list = sorted(df[df["year"].isin(selected_years)]["Team name"].dropna().unique())
+    team_options = ["All"] + team_list
+    selected_teams = st.multiselect(
+        "Select Team(s)", options=team_options, default=["All"]
+    )
 
-        col5, col6 = st.columns(2)
-        with col5:
-            departments = sorted(df["Department"].dropna().unique())
-            dept_options = ["All"] + departments
-            selected_dept = st.multiselect(
-                "Filter by Department", dept_options, default=["All"]
-            )
-
-        with col6:
-            locations_raw = df["Seating Location"].dropna().unique()
-            locations = sorted(
-                set(x.replace("Bhive,", "Bhive, ") for x in locations_raw)
-            )
-            loc_options = ["All"] + locations
-            selected_loc = st.multiselect(
-                "Filter by Location", loc_options, default=["All"]
-            )
+    # Recognition System selector
+    recognition_systems = sorted(df["Nominated In"].dropna().unique())
+    rec_options = ["All"] + recognition_systems
+    selected_sys = st.multiselect("Recognition System", rec_options, default=["All"])
 
     # ========= APPLY FILTERS =========
     df_filtered = df[
@@ -220,12 +141,8 @@ def show_award_analysis():
 
     if "All" not in selected_sys:
         df_filtered = df_filtered[df_filtered["Nominated In"].isin(selected_sys)]
-
-    if "All" not in selected_dept:
-        df_filtered = df_filtered[df_filtered["Department"].isin(selected_dept)]
-
-    if "All" not in selected_loc:
-        df_filtered = df_filtered[df_filtered["Seating Location"].isin(selected_loc)]
+    if "All" not in selected_teams:
+        df_filtered = df_filtered[df_filtered["Team name"].isin(selected_teams)]
 
     if period == "Monthly":
         df_filtered["Period"] = df_filtered["Date"].dt.to_period("M").dt.to_timestamp()
@@ -340,20 +257,15 @@ def show_award_analysis():
         df_for_sankey = df_for_sankey[
             df_for_sankey["Nominated In"].isin(selected_sys)
         ]
-    if "All" not in selected_dept:
+    if "All" not in selected_teams:
         df_for_sankey = df_for_sankey[
-            df_for_sankey["Department"].isin(selected_dept)
-        ]
-    if "All" not in selected_loc:
-        df_for_sankey = df_for_sankey[
-            df_for_sankey["Seating Location"].isin(selected_loc)
+            df_for_sankey["Team name"].isin(selected_teams)
         ]
 
     df_for_sankey["Sankey_Target"] = df_for_sankey["New_Award_title"].apply(
         map_sankey_bucket
     )
     df_for_sankey = df_for_sankey.dropna(subset=["Sankey_Target"])
-
     sankey_targets = sorted(df_for_sankey["Sankey_Target"].unique())
 
     def clean_team_list(series):
@@ -365,7 +277,6 @@ def show_award_analysis():
         st.info("No Sankey targets (Team / Spot / OTA) in current filters.")
     else:
         tabs = st.tabs(sankey_targets)
-
         for tab, target_award in zip(tabs, sankey_targets):
             with tab:
                 sankey_df = df_for_sankey[
@@ -374,40 +285,32 @@ def show_award_analysis():
                 if sankey_df.empty:
                     st.info("No data available for this bucket in the current filters.")
                     continue
-
                 sankey_group = (
                     sankey_df.groupby(["Award Title", "Sankey_Target"])
                     .size()
                     .reset_index(name="Count")
                 )
-
                 team_names_by_title = (
                     sankey_df.dropna(subset=["Award Title", "Team name"])
                     .groupby("Award Title")["Team name"]
                     .apply(clean_team_list)
                     .to_dict()
                 )
-
                 raw_titles = sankey_group["Award Title"].astype(str).unique().tolist()
                 labels = raw_titles + [target_award]
                 label_to_idx = {lbl: i for i, lbl in enumerate(labels)}
-
                 sources = [
-                    label_to_idx[row["Award Title"]]
-                    for _, row in sankey_group.iterrows()
+                    label_to_idx[row["Award Title"]] for _, row in sankey_group.iterrows()
                 ]
                 targets = [
                     label_to_idx[target_award] for _ in sankey_group.itertuples()
                 ]
                 values = sankey_group["Count"].tolist()
-
                 link_customdata = [
                     team_names_by_title.get(row["Award Title"], "No team info")
                     for _, row in sankey_group.iterrows()
                 ]
-
                 link_color = AWARD_COLORS.get(target_award, "#A7C7E7")
-
                 fig_sankey = go.Figure(
                     data=[
                         go.Sankey(
@@ -429,7 +332,6 @@ def show_award_analysis():
                         )
                     ]
                 )
-
                 fig_sankey.update_layout(
                     title=f"Raw Award Titles → {target_award}",
                     font=dict(size=15, color="black"),
@@ -446,10 +348,8 @@ def show_award_analysis():
         "<p class='section-title'>Most Frequently Given Awards</p>",
         unsafe_allow_html=True,
     )
-
     top_awards = df_filtered["New_Award_title"].value_counts().reset_index()
     top_awards.columns = ["Award Title", "Count"]
-
     fig1 = px.bar(
         top_awards,
         x="Award Title",
@@ -468,14 +368,12 @@ def show_award_analysis():
         "<p class='section-title'>Team-Wise Award Distribution (Treemap)</p>",
         unsafe_allow_html=True,
     )
-
     team_awards = (
         df_filtered.groupby(["New_Award_title", "Team name"])
         .size()
         .reset_index(name="Award Count")
     )
     team_awards = team_awards[~team_awards["Team name"].apply(is_unknown_team)]
-
     if not team_awards.empty:
         fig2 = px.treemap(
             team_awards,
@@ -495,9 +393,7 @@ def show_award_analysis():
         "<p class='section-title'>Top Award-Winning Teams</p>",
         unsafe_allow_html=True,
     )
-
     df_leader = df_filtered[~df_filtered["Team name"].apply(is_unknown_team)].copy()
-
     leaderboard = (
         df_leader.groupby("Team name")
         .agg(
@@ -506,16 +402,13 @@ def show_award_analysis():
         )
         .reset_index()
     )
-
     leaderboard["Recognition_Score"] = (
         (leaderboard["People_Count"] * 0.6)
         + (leaderboard["Award_Count"] * 0.4)
     ).round(2)
-
     leaderboard = leaderboard.sort_values(
         by="Recognition_Score", ascending=False
     ).head(10)
-
     if not leaderboard.empty:
         fig3 = px.bar(
             leaderboard,
@@ -561,13 +454,11 @@ def show_award_analysis():
         "<p class='section-title'>Award Growth Over Time</p>",
         unsafe_allow_html=True,
     )
-
     timeline = (
         df_filtered.groupby(["Period", "New_Award_title"])
         .size()
         .reset_index(name="Award Count")
     )
-
     if timeline.empty:
         st.info("No timeline data available for the current filters.")
     else:
@@ -580,13 +471,11 @@ def show_award_analysis():
             color_discrete_map=AWARD_COLORS,
             title="Recognition Timeline by Award Type",
         )
-
         fig_time.update_traces(
             mode="lines+markers",
             line=dict(width=3.5, color=None),
             marker=dict(size=10, line=dict(width=1, color="black")),
         )
-
         fig_time.update_layout(
             template="plotly_white",
             height=480,
@@ -594,12 +483,9 @@ def show_award_analysis():
             margin=dict(l=30, r=30, t=50, b=40),
             legend_title_text="Award Type",
         )
-
         fig_time.update_xaxes(showgrid=True, gridcolor="rgba(0,0,0,0.1)")
         fig_time.update_yaxes(showgrid=True, gridcolor="rgba(0,0,0,0.1)")
-
         st.plotly_chart(fig_time, use_container_width=True)
-
 
 if __name__ == "__main__":
     show_award_analysis()

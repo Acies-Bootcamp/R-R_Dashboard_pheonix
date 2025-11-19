@@ -287,8 +287,8 @@ def display_team_level_kpis(
             <div class="metric-card">
                 <h4>
                   <span class="kpi-label">
-                    Avg Teams/Month (All Hands)
-                    <span class="kpi-help" title="Average number of unique teams per month in All Hands for selected filters.">?</span>
+                   Monthly Team Reach (All Hands)                    
+                   <span class="kpi-help" title="Average number of different teams recognized in a typical month for selected filters(all-hands)">?</span>
                   </span>
                 </h4>
                 <h2>{avg_month_all}</h2>
@@ -302,8 +302,8 @@ def display_team_level_kpis(
             <div class="metric-card">
                 <h4>
                   <span class="kpi-label">
-                    Avg Teams/Month (Kudos Corner)
-                    <span class="kpi-help" title="Average number of unique teams per month in Kudos Corner for selected filters.">?</span>
+                    Monthly Team Reach (Kudos Corner)
+                    <span class="kpi-help" title="Average number of different teams recognized in a typical month for selected filters(kudos corner).">?</span>
                   </span>
                 </h4>
                 <h2>{avg_month_kudos}</h2>
@@ -822,135 +822,6 @@ def show_recognition_team_tab():
     # ✅ AWESOME AWARDS - RECIPROCAL NOMINATIONS
     # ============================================================
 
-    st.markdown("---")
-    st.header("🔄 Awesome Awards - Reciprocal Nominations")
-
-    # ✅ LOAD FRESH DATA WITHOUT UNKNOWN FILTER
-    url = "https://docs.google.com/spreadsheets/d/1xVpXomZBOyIeyvpyDjXQlSEIfU35v6j0jkhdaETm4-Q/export?format=xlsx"
-    df_raw = pd.read_excel(url)
-
-    # Get ALL Kudos Corner Awesome Awards (INCLUDING Unknown teams)
-    awesome_kudos = df_raw[
-        df_raw['New_Award_title'].astype(str).str.lower().str.contains('awesome', na=False) &
-        df_raw['Nominated In'].astype(str).str.lower().str.contains('kudos', na=False)
-    ].copy()
-
-    if awesome_kudos.empty:
-        st.info("No Kudos Corner Awesome Awards found.")
-    else:
-        # Get type breakdown
-        type_counts = awesome_kudos['Type'].value_counts().to_dict()
-        
-        # Find reciprocals
-        def norm(x):
-            return str(x).strip().lower()
-        
-        awesome_kudos['Nominee'] = awesome_kudos['Employee Name'].apply(norm)
-        awesome_kudos['Nominator'] = awesome_kudos['Nominated By'].apply(norm)
-        
-        # Remove invalid
-        awesome_kudos = awesome_kudos[
-            (awesome_kudos['Nominee'] != '') & 
-            (awesome_kudos['Nominator'] != '') &
-            (awesome_kudos['Nominee'] != 'nan') &
-            (awesome_kudos['Nominator'] != 'nan') &
-            (awesome_kudos['Nominee'] != awesome_kudos['Nominator'])
-        ]
-        
-        pairs = set(zip(awesome_kudos['Nominee'], awesome_kudos['Nominator']))
-        reciprocal_data = []
-        
-        for a, b in pairs:
-            if (b, a) in pairs and a != b:
-                pair_key = tuple(sorted([a, b]))
-                if pair_key not in [tuple(sorted([p['Person A'].lower(), p['Person B'].lower()])) for p in reciprocal_data]:
-                    a_to_b = awesome_kudos[(awesome_kudos['Nominator'] == a) & (awesome_kudos['Nominee'] == b)]
-                    b_to_a = awesome_kudos[(awesome_kudos['Nominator'] == b) & (awesome_kudos['Nominee'] == a)]
-                    
-                    reciprocal_data.append({
-                        'Person A': a.title(),
-                        'Person B': b.title(),
-                        'A → B Times': len(a_to_b),
-                        'B → A Times': len(b_to_a),
-                        'Total Mutual': len(a_to_b) + len(b_to_a)
-                    })
-        
-        # KPI Cards
-        k1, k2, k3, k4 = st.columns(4)
-        
-        with k1:
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <h4>
-                    <span class="kpi-label">
-                        Total Awesome Awards
-                        <span class="kpi-help" title="Total Awesome Awards in Kudos Corner (all types).">?</span>
-                    </span>
-                    </h4>
-                    <h2>{len(awesome_kudos)}</h2>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        
-        with k2:
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <h4>
-                    <span class="kpi-label">
-                        Peer to Peer
-                        <span class="kpi-help" title="Awards between peers at the same level.">?</span>
-                    </span>
-                    </h4>
-                    <h2>{type_counts.get('Peer to Peer', 0)}</h2>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        
-        with k3:
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <h4>
-                    <span class="kpi-label">
-                        Mentor to Peer
-                        <span class="kpi-help" title="Awards from mentors/seniors to junior peers.">?</span>
-                    </span>
-                    </h4>
-                    <h2>{type_counts.get('Mentor to Peer', 0)}</h2>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        
-        with k4:
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <h4>
-                    <span class="kpi-label">
-                        Reciprocal Pairs
-                        <span class="kpi-help" title="Number of pairs who nominated each other.">?</span>
-                    </span>
-                    </h4>
-                    <h2>{len(reciprocal_data)}</h2>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        
-        # Reciprocal Table
-        st.subheader("Reciprocal Nominations (Who Nominated Each Other)")
-        
-        if reciprocal_data:
-            reciprocal_df = pd.DataFrame(reciprocal_data)
-            st.dataframe(reciprocal_df, use_container_width=True, hide_index=True)
-            st.caption(f"Found {len(reciprocal_data)} reciprocal pair(s) out of {len(awesome_kudos)} total Awesome Awards")
-        else:
-            st.success("✅ No reciprocal nominations found - all awards are one-way recognition!")
 
 if __name__ == "__main__":
     show_recognition_team_tab()
