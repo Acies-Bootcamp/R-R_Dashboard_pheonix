@@ -317,7 +317,7 @@ def display_team_level_kpis(
             <div class="metric-card">
                 <h4>
                   <span class="kpi-label">
-                    Total Awards Distributed
+                    Total Coupons Distributed
                     <span class="kpi-help" title="Total awards distributed across all types (Team, Spot, Champion, Awesome).">?</span>
                   </span>
                 </h4>
@@ -512,7 +512,7 @@ def show_recognition_team_tab():
 
     df = load_and_process_data()
 
-    st.title("Team-Level Trends")
+    # st.title("Team-Level Trends")
     st.caption(
         "These charts show *team-level trends* for **Team Awards**, **Spot Awards**, **Champion Awards**, and **Awesome Awards**. "
         "**All Hands** represents the legacy ceremony, and **Kudos Corner** represents the new system."

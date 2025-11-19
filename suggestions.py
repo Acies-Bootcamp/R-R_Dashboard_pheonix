@@ -35,7 +35,7 @@ def show_suggestions_page():
 
     # 2) Spot Awards – restore emotional impact & visibility
     spot_text = """
-    • Add a short “Recognition Recap” segment (about 3 minutes) in every Town Hall.
+    • Add a short “Recognition Recap” segment (about 3 minutes) in every ALl-Hands.
     • Use this segment to highlight the month’s Spot Award winners and key recognitions.
     • Prepare large-screen slides for Spot Awardees including:
       – Winner’s name and team with picture

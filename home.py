@@ -106,11 +106,11 @@ def show_home_page():
     with col3:
         st.markdown("""
         **Coupon Forecasting Module**  
-        - SARIMA and Moving Average models  
+        - Holt-Winters with fallback logic
         """)
     with col4:
         st.markdown("""
-        **Insights Module**  
+        **Recommendations Module**  
         - Recommendations and fairness analysis  
         """)
 
