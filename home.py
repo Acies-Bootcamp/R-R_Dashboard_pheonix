@@ -52,8 +52,8 @@ def show_navbar():
     # Navigation buttons (no emojis)
     nav_button(nav_cols[0], "Home", "nav_home", "Home")
     nav_button(nav_cols[1], "Overview", "nav_overview", "Overview")
-    nav_button(nav_cols[2], "Recognition", "nav_recognition", "Recognition")
-    nav_button(nav_cols[3], "Award Analysis", "nav_award", "Award Analysis")
+    nav_button(nav_cols[2], "Award Analysis", "nav_award", "Award Analysis")
+    nav_button(nav_cols[3], "Recognition", "nav_recognition", "Recognition")
     nav_button(nav_cols[4], "Coupon Estimation", "nav_coupon", "Coupon Estimation")
     nav_button(nav_cols[5], "Recommendations", "nav_recommendations", "Recommendations")
 
@@ -106,11 +106,11 @@ def show_home_page():
     with col3:
         st.markdown("""
         **Coupon Forecasting Module**  
-        - SARIMA and Moving Average models  
+        - Holt-Winters with fallback logic
         """)
     with col4:
         st.markdown("""
-        **Insights Module**  
+        **Recommendations Module**  
         - Recommendations and fairness analysis  
         """)
 

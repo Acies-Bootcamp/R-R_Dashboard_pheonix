@@ -647,7 +647,7 @@ def show_rr_dashboard():
 
     st.divider()
 
-    # ✅ ENGAGEMENT PIE CHART (WITH CUSTOM LABEL FOR "BOTH EQUALLY ENGAGING")
+    # ✅ ENGAGEMENT PIE CHART (WITH MAPPED LABELS)
     st.markdown("<p class='section-title'>📊 Which version is more engaging?</p>", unsafe_allow_html=True)
 
     engaging_col = COLS["engaging"]
@@ -655,12 +655,43 @@ def show_rr_dashboard():
         engaging_data = survey_participants[engaging_col].value_counts().reset_index()
         engaging_data.columns = ["Version", "Count"]
         
-        # ✅ FILTER OUT "Both are equally engaging" for pie chart
-        both_engaging = engaging_data[engaging_data["Version"].str.contains("both", case=False, na=False)]
+        # ✅ MAP RAW SURVEY RESPONSES TO CLEAN LABELS
+        label_mapping = {
+            "town hall": "All Hands",
+            "all hands": "All Hands",
+            "earlier": "All Hands",
+            "earlier system": "All Hands",
+            "earlier all-hands": "All Hands",
+            "the earlier all-hands": "All Hands",
+            "all-hands": "All Hands",
+            "current": "Kudos Corner",
+            "current system": "Kudos Corner",
+            "kudos corner": "Kudos Corner",
+            "kudos bot": "Kudos Corner",
+            "the current kudos bot system": "Kudos Corner",
+            "both": "Both Equally Engaging",
+            "both are equally engaging": "Both Equally Engaging",
+            "both equally engaging": "Both Equally Engaging",
+        }
+        
+        # Apply mapping (case-insensitive)
+        def map_label(raw_label):
+            if pd.isna(raw_label):
+                return raw_label
+            raw_lower = str(raw_label).strip().lower()
+            return label_mapping.get(raw_lower, raw_label)
+        
+        engaging_data["Version"] = engaging_data["Version"].apply(map_label)
+        
+        # Group by mapped labels (in case multiple raw values map to same label)
+        engaging_data = engaging_data.groupby("Version", as_index=False)["Count"].sum()
+        
+        # ✅ FILTER OUT "Both Equally Engaging" for pie chart
+        both_engaging = engaging_data[engaging_data["Version"] == "Both Equally Engaging"]
         both_count = both_engaging["Count"].sum() if not both_engaging.empty else 0
         
-        # Only show "Earlier" vs "Current" in pie chart
-        pie_data = engaging_data[~engaging_data["Version"].str.contains("both", case=False, na=False)]
+        # Only show "All Hands" vs "Kudos Corner" in pie chart
+        pie_data = engaging_data[engaging_data["Version"] != "Both Equally Engaging"]
         
         if not pie_data.empty:
             fig_pie = px.pie(
@@ -668,7 +699,7 @@ def show_rr_dashboard():
                 names="Version",
                 values="Count",
                 title="R&R Program Engagement Preference",
-                color_discrete_sequence=["#2563EB", "#10B981", "#F59E0B"],
+                color_discrete_sequence=["#2563EB", "#10B981"],
             )
 
             fig_pie.update_traces(
